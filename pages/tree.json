@@ -1,0 +1,86 @@
+{
+  "meta": {
+    "slug": "tree",
+    "chapter": "CHAPTER 15",
+    "title": "树与搜索：分层数据结构",
+    "subtitle": "BST、红黑树、B 树——有序性的数学根基",
+    "updated": "2026-05-25",
+    "reading_time": "12 分钟",
+    "audience": ["后端工程师", "数据库方向开发者"],
+    "problems_solved": [
+      "BST 为什么最坏退化成链表",
+      "B 树为什么比红黑树更适合数据库索引",
+      "树的高度和查询性能是什么关系"
+    ],
+    "takeaways": [
+      "BST 有序性：中序遍历得到有序序列",
+      "平衡树通过旋转维持 O(log n) 高度",
+      "B 树减少磁盘 IO，是数据库索引的标准结构"
+    ],
+    "breadcrumbs": ["程序猿数学课", "图与结构", "树与搜索"],
+    "prev": { "slug": "graph", "title": "图论基础：连接的数学" },
+    "next": { "slug": "complexity", "title": "算法复杂度：渐进分析" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "树是有层次的图（无环连通图）。二叉搜索树把有序性嵌入结构，平衡树保证最坏情况也是 O(log n)，B 树针对磁盘访问模式优化。理解树，你就理解了数据库索引、文件系统、编译器语法树的设计决策。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "二叉搜索树：有序性的结构表达" },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\ntype BST struct {\n    val         int\n    left, right *BST\n}\n\nfunc (t *BST) Insert(val int) *BST {\n    if t == nil {\n        return &BST{val: val}\n    }\n    if val < t.val {\n        t.left = t.left.Insert(val)\n    } else if val > t.val {\n        t.right = t.right.Insert(val)\n    }\n    return t\n}\n\n// BST 性质：中序遍历 = 升序序列\nfunc (t *BST) InOrder() []int {\n    if t == nil {\n        return nil\n    }\n    result := t.left.InOrder()\n    result = append(result, t.val)\n    result = append(result, t.right.InOrder()...)\n    return result\n}\n\n// 高度：衡量最坏情况复杂度\nfunc (t *BST) Height() int {\n    if t == nil {\n        return 0\n    }\n    lh, rh := t.left.Height(), t.right.Height()\n    if lh > rh {\n        return lh + 1\n    }\n    return rh + 1\n}\n\nfunc main() {\n    var root *BST\n    for _, v := range []int{5, 3, 7, 1, 4, 6, 8} {\n        root = root.Insert(v)\n    }\n    fmt.Println(\"中序遍历:\", root.InOrder())  // [1 2 3 4 5 6 7 8]\n    fmt.Println(\"树高:\", root.Height())  // 3（平衡）\n\n    // 最坏情况：顺序插入退化成链表\n    var degenerate *BST\n    for _, v := range []int{1, 2, 3, 4, 5, 6, 7} {\n        degenerate = degenerate.Insert(v)\n    }\n    fmt.Println(\"退化树高:\", degenerate.Height())  // 7（链表）\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "AVL 树：最严格的平衡" },
+    {
+      "type": "paragraph",
+      "text": "AVL 树要求每个节点的左右子树高度差（平衡因子）≤ 1。通过**四种旋转**（左旋、右旋、左右旋、右左旋）维持这个不变量。树高严格 ≤ 1.44 log₂(n+2)，保证所有操作 O(log n)。代价是插入/删除时可能需要多次旋转，比红黑树常数略大。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\ntype AVL struct {\n    val, height int\n    left, right *AVL\n}\n\nfunc height(n *AVL) int {\n    if n == nil { return 0 }\n    return n.height\n}\n\nfunc updateHeight(n *AVL) {\n    lh, rh := height(n.left), height(n.right)\n    if lh > rh { n.height = lh + 1 } else { n.height = rh + 1 }\n}\n\nfunc balanceFactor(n *AVL) int { return height(n.left) - height(n.right) }\n\n// 右旋（修复左重不平衡）\nfunc rotateRight(y *AVL) *AVL {\n    x := y.left\n    y.left = x.right\n    x.right = y\n    updateHeight(y)\n    updateHeight(x)\n    return x\n}\n\n// 左旋\nfunc rotateLeft(x *AVL) *AVL {\n    y := x.right\n    x.right = y.left\n    y.left = x\n    updateHeight(x)\n    updateHeight(y)\n    return y\n}\n\nfunc balance(n *AVL) *AVL {\n    updateHeight(n)\n    bf := balanceFactor(n)\n    if bf > 1 {  // 左重\n        if balanceFactor(n.left) < 0 { n.left = rotateLeft(n.left) }  // 左右情况\n        return rotateRight(n)\n    }\n    if bf < -1 {  // 右重\n        if balanceFactor(n.right) > 0 { n.right = rotateRight(n.right) }  // 右左情况\n        return rotateLeft(n)\n    }\n    return n\n}\n\nfunc insert(n *AVL, val int) *AVL {\n    if n == nil { return &AVL{val: val, height: 1} }\n    if val < n.val { n.left = insert(n.left, val) } else if val > n.val { n.right = insert(n.right, val) }\n    return balance(n)\n}\n\nfunc main() {\n    var root *AVL\n    for _, v := range []int{1, 2, 3, 4, 5, 6, 7} {  // 顺序插入\n        root = insert(root, v)\n    }\n    fmt.Println(\"AVL 树高:\", height(root))  // 3（自动平衡）\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "B 树：为磁盘 IO 优化的平衡树" },
+    {
+      "type": "paragraph",
+      "text": "B 树（B-tree）是 m 阶平衡树，每个节点最多 m-1 个键和 m 个子节点。树高 `h = O(log_m n)`，==m 越大，树越矮，磁盘 IO 越少==。数据库索引用 B+ 树（所有数据在叶节点，叶节点用链表串联），范围查询只需扫描叶节点链表。"
+    },
+    {
+      "type": "decision_table",
+      "headers": ["树结构", "查询", "插入/删除", "内存效率", "适用场景"],
+      "rows": [
+        ["BST",      "O(n) 最坏",  "O(n) 最坏",  "高",   "不推荐生产使用"],
+        ["AVL 树",   "O(log n)",   "O(log n)",   "高",   "读多写少，严格平衡"],
+        ["红黑树",   "O(log n)",   "O(log n)",   "高",   "写多场景（Go map 底层）"],
+        ["B/B+ 树",  "O(log_m n)", "O(log_m n)", "低",   "磁盘数据库索引（MySQL、PostgreSQL）"]
+      ],
+      "mnemonic": "**内存用红黑树，磁盘用 B+树。m 越大 IO 越少，但内存代价越高。**"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "需要有序操作（范围查找、最大最小）用平衡 BST",
+        "需要持久化/大数据量索引用 B/B+ 树",
+        "Go 的 `sort` 包 + 有序切片可以替代简单场景的 BST"
+      ],
+      "dont": [
+        "生产代码自己实现红黑树——用 `github.com/google/btree`",
+        "以为 BST 查询总是 O(log n)——只有平衡时才是"
+      ],
+      "pitfalls": [
+        "B+ 树叶节点的链表结构让范围查询 O(k+log n)，而非 B 树的 O(k log n)"
+      ],
+      "criterion": "**判断标准**：能解释为什么数据库索引用 B+树而非红黑树 → 掌握本章。"
+    },
+    {
+      "type": "quote",
+      "text": "树是图的简化，也是数据结构的骨架——理解树，你就理解了分层的本质。",
+      "by": "算法导论"
+    }
+  ]
+}

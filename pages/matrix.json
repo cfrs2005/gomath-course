@@ -1,0 +1,91 @@
+{
+  "meta": {
+    "slug": "matrix",
+    "chapter": "CHAPTER 09",
+    "title": "矩阵运算：线性代数入门",
+    "subtitle": "图形变换、线性方程组、神经网络的共同语言",
+    "updated": "2026-05-25",
+    "reading_time": "14 分钟",
+    "audience": ["后端工程师", "图形学开发者", "ML 入门者"],
+    "problems_solved": [
+      "矩阵乘法为什么是那个奇怪的定义",
+      "高斯消元怎么解线性方程组",
+      "神经网络的前向传播为什么全是矩阵乘法"
+    ],
+    "takeaways": [
+      "矩阵乘法 AB 的 (i,j) 项是 A 的第 i 行点积 B 的第 j 列",
+      "矩阵是线性变换的数学表示",
+      "高斯消元 O(n³) 解 n 元线性方程组"
+    ],
+    "breadcrumbs": ["程序猿数学课", "线性代数", "矩阵运算"],
+    "prev": { "slug": "probability", "title": "概率论基础：随机的本质" },
+    "next": { "slug": "vector", "title": "向量与空间变换" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "矩阵是线性代数的核心数据结构。它不只是二维数组——它是线性变换的表示、联立方程组的系数、神经网络的权重层。理解矩阵乘法的几何含义，线性代数就豁然开朗。"
+    },
+    {
+      "type": "principle",
+      "text": "矩阵乘法 = 线性变换的复合。AB 先做 B 的变换，再做 A 的变换。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "矩阵的基本运算" },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\ntype Matrix struct {\n    rows, cols int\n    data       [][]float64\n}\n\nfunc NewMatrix(rows, cols int) *Matrix {\n    data := make([][]float64, rows)\n    for i := range data {\n        data[i] = make([]float64, cols)\n    }\n    return &Matrix{rows, cols, data}\n}\n\n// 矩阵乘法：O(n³)\nfunc Mul(a, b *Matrix) *Matrix {\n    if a.cols != b.rows {\n        panic(\"维度不匹配\")\n    }\n    c := NewMatrix(a.rows, b.cols)\n    for i := 0; i < a.rows; i++ {\n        for j := 0; j < b.cols; j++ {\n            for k := 0; k < a.cols; k++ {\n                c.data[i][j] += a.data[i][k] * b.data[k][j]\n            }\n        }\n    }\n    return c\n}\n\n// 转置\nfunc Transpose(a *Matrix) *Matrix {\n    b := NewMatrix(a.cols, a.rows)\n    for i := 0; i < a.rows; i++ {\n        for j := 0; j < a.cols; j++ {\n            b.data[j][i] = a.data[i][j]\n        }\n    }\n    return b\n}\n\nfunc main() {\n    // 2x2 矩阵乘法\n    a := &Matrix{2, 2, [][]float64{{1, 2}, {3, 4}}}\n    b := &Matrix{2, 2, [][]float64{{5, 6}, {7, 8}}}\n    c := Mul(a, b)\n    fmt.Println(c.data)  // [[19 22] [43 50]]\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "高斯消元：解线性方程组" },
+    {
+      "type": "paragraph",
+      "text": "高斯消元把增广矩阵化为行阶梯型，然后回代求解。时间复杂度 O(n³)。是数值线性代数的基础，背后是矩阵的 LU 分解。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n)\n\n// 高斯消元解 Ax = b，返回解向量 x\n// augmented: n x (n+1) 增广矩阵 [A|b]\nfunc gaussianElimination(aug [][]float64) []float64 {\n    n := len(aug)\n    for col := 0; col < n; col++ {\n        // 选主元（部分主元法，减少数值误差）\n        maxRow := col\n        for r := col + 1; r < n; r++ {\n            if math.Abs(aug[r][col]) > math.Abs(aug[maxRow][col]) {\n                maxRow = r\n            }\n        }\n        aug[col], aug[maxRow] = aug[maxRow], aug[col]\n\n        pivot := aug[col][col]\n        if math.Abs(pivot) < 1e-10 {\n            continue  // 奇异矩阵\n        }\n\n        // 消元\n        for r := col + 1; r < n; r++ {\n            factor := aug[r][col] / pivot\n            for j := col; j <= n; j++ {\n                aug[r][j] -= factor * aug[col][j]\n            }\n        }\n    }\n\n    // 回代\n    x := make([]float64, n)\n    for i := n - 1; i >= 0; i-- {\n        x[i] = aug[i][n]\n        for j := i + 1; j < n; j++ {\n            x[i] -= aug[i][j] * x[j]\n        }\n        x[i] /= aug[i][i]\n    }\n    return x\n}\n\nfunc main() {\n    // 解方程组：x + 2y = 5，3x + 4y = 6\n    aug := [][]float64{\n        {1, 2, 5},\n        {3, 4, 6},\n    }\n    x := gaussianElimination(aug)\n    fmt.Printf(\"x=%.1f, y=%.1f\\n\", x[0], x[1])  // x=-4.0, y=4.5\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "矩阵与神经网络的关系" },
+    {
+      "type": "paragraph",
+      "text": "神经网络的一层前向传播可以写成 `output = activation(W × input + b)`，其中 W 是权重矩阵，b 是偏置向量。**批量计算**时，同时处理 batch_size 个样本，input 变成矩阵，整个计算是两次矩阵乘法加一次激活函数。GPU 之所以快，是因为它专门为大矩阵乘法优化了硬件。"
+    },
+    {
+      "type": "decision_table",
+      "headers": ["矩阵概念", "神经网络对应", "Go 实现"],
+      "rows": [
+        ["权重矩阵 W", "全连接层的参数", "[][]float64"],
+        ["矩阵乘法 Wx", "线性变换（前向传播）", "Mul(W, x)"],
+        ["转置 Wᵀ", "反向传播的梯度计算", "Transpose(W)"],
+        ["矩阵求逆", "正规方程法求解 θ", "高斯消元 / LU 分解"],
+        ["行列式", "判断矩阵是否可逆", "递归展开 / LU 分解"]
+      ],
+      "mnemonic": "**前向传播 = 矩阵乘法链，反向传播 = 链式法则 + 转置。**"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "用列优先存储（column-major）提高缓存命中率",
+        "大矩阵运算直接用 gonum 或 NumPy 风格库",
+        "数值计算中始终用部分主元法而非朴素消元"
+      ],
+      "dont": [
+        "矩阵乘法不满足交换律——AB ≠ BA，顺序要对",
+        "直接求矩阵逆来解线性方程组——用 LU 分解更稳定更快"
+      ],
+      "pitfalls": [
+        "浮点累加误差在高维矩阵乘法中会放大——必要时用 Kahan 求和"
+      ],
+      "criterion": "**判断标准**：能用矩阵表示一个神经网络层，并写出前向传播代码 → 掌握本章。"
+    },
+    {
+      "type": "quote",
+      "text": "线性代数是数学中最实用的分支——它统一了几何、方程组和数据科学。",
+      "by": "Gilbert Strang《线性代数导论》"
+    }
+  ]
+}

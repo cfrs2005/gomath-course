@@ -1,0 +1,113 @@
+{
+  "meta": {
+    "slug": "ml-math",
+    "chapter": "CHAPTER 19",
+    "title": "机器学习中的数学",
+    "subtitle": "线性回归到反向传播，把前 18 章全串起来",
+    "updated": "2026-05-25",
+    "reading_time": "16 分钟",
+    "audience": ["ML 工程师", "想从工程到算法突破的开发者"],
+    "problems_solved": [
+      "线性回归的最小二乘法从哪里来",
+      "softmax 的数值稳定版本怎么写",
+      "反向传播的整体数学链条是什么"
+    ],
+    "takeaways": [
+      "最小二乘 = 最大化正态分布似然 = 最小化 MSE，三位一体",
+      "梯度下降 + 链式法则 + 矩阵求导 = 反向传播",
+      "前 18 章每个数学工具在 ML 里都有具体对应"
+    ],
+    "breadcrumbs": ["程序猿数学课", "应用前沿", "机器学习中的数学"],
+    "prev": { "slug": "information", "title": "信息论与熵" },
+    "next": { "slug": "index", "title": "回到起点：重新审视你的代码" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "这一章是整个课程的综合。机器学习不是魔法——它是**线性代数 + 微积分 + 概率论 + 信息论**的工程组合。把每个 ML 操作翻译回数学，你就从「调参侠」变成了「能设计算法的工程师」。"
+    },
+    {
+      "type": "principle",
+      "text": "ML = 定义损失函数 + 用梯度下降最小化它。所有复杂性都藏在这两步里。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "线性回归：三位一体" },
+    {
+      "type": "paragraph",
+      "text": "最小二乘法（MSE 损失）、最大似然估计（假设噪声服从正态分布）、正则方程（解析解 `θ = (XᵀX)⁻¹Xᵀy`）——**这三种推导方式给出同一个答案**。理解这个等价性，你就理解了为什么 MSE 是回归问题的自然选择。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\n// 一元线性回归：最小二乘法\n// y = wx + b，最小化 Σ(yi - (w*xi + b))²\nfunc linearRegression(xs, ys []float64) (w, b float64) {\n    n := float64(len(xs))\n    sumX, sumY, sumXY, sumXX := 0.0, 0.0, 0.0, 0.0\n    for i, x := range xs {\n        sumX += x\n        sumY += ys[i]\n        sumXY += x * ys[i]\n        sumXX += x * x\n    }\n    // 正规方程解析解\n    w = (n*sumXY - sumX*sumY) / (n*sumXX - sumX*sumX)\n    b = (sumY - w*sumX) / n\n    return\n}\n\nfunc main() {\n    // 训练数据：y ≈ 2x + 1（加噪声）\n    xs := []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}\n    ys := []float64{2.9, 5.1, 6.8, 9.2, 11.0, 13.1, 15.0, 16.8, 18.9, 21.1}\n\n    w, b := linearRegression(xs, ys)\n    fmt.Printf(\"拟合结果: y = %.4fx + %.4f\\n\", w, b)  // ≈ y = 2x + 1\n\n    // 预测\n    predict := func(x float64) float64 { return w*x + b }\n    fmt.Printf(\"x=11 预测: %.2f\\n\", predict(11))\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "Softmax 与数值稳定" },
+    {
+      "type": "paragraph",
+      "text": "Softmax 把 logits 转为概率分布：`softmax(z)_i = e^{z_i} / Σ e^{z_j}`。直接计算会溢出（e^1000 = inf）。数值稳定版本：先减去 max(z)，数学上等价但避免溢出。这是实现细节，但体现了数学和工程的交叉——==用等价变换保证数值稳定==。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n)\n\n// 数值不稳定版本（logits 大时溢出）\nfunc softmaxNaive(z []float64) []float64 {\n    out := make([]float64, len(z))\n    sum := 0.0\n    for _, zi := range z {\n        sum += math.Exp(zi)\n    }\n    for i, zi := range z {\n        out[i] = math.Exp(zi) / sum\n    }\n    return out\n}\n\n// 数值稳定版本：先减 max（数学等价）\nfunc softmax(z []float64) []float64 {\n    maxZ := z[0]\n    for _, zi := range z { if zi > maxZ { maxZ = zi } }\n\n    out := make([]float64, len(z))\n    sum := 0.0\n    for i, zi := range z {\n        out[i] = math.Exp(zi - maxZ)\n        sum += out[i]\n    }\n    for i := range out { out[i] /= sum }\n    return out\n}\n\nfunc main() {\n    // 正常 logits\n    logits := []float64{2.0, 1.0, 0.1}\n    fmt.Println(\"softmax:\", softmax(logits))  // [0.659, 0.242, 0.099]\n\n    // 大 logits：naive 溢出，stable 正常\n    bigLogits := []float64{1000, 999, 998}\n    fmt.Println(\"naive:\", softmaxNaive(bigLogits))   // [NaN NaN NaN]\n    fmt.Println(\"stable:\", softmax(bigLogits))        // [0.665 0.245 0.090]\n\n    // 交叉熵损失（用 log-softmax 合并计算，更稳定）\n    logSoftmax := func(z []float64, i int) float64 {\n        sm := softmax(z)\n        return math.Log(sm[i])\n    }\n    // 真实标签是类别 0，预测 logits\n    loss := -logSoftmax(logits, 0)\n    fmt.Printf(\"交叉熵损失: %.4f\\n\", loss)\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "反向传播：全链路数学" },
+    {
+      "type": "paragraph",
+      "text": "一个两层神经网络的完整数学链路：\n\n1. **前向传播**：`z₁ = W₁x + b₁`，`a₁ = ReLU(z₁)`，`z₂ = W₂a₁ + b₂`，`ŷ = softmax(z₂)`\n2. **损失**：`L = CrossEntropy(y, ŷ) = -Σ yᵢ log ŷᵢ`\n3. **反向传播**（链式法则）：`∂L/∂W₁ = ∂L/∂z₂ × ∂z₂/∂a₁ × ∂a₁/∂z₁ × ∂z₁/∂W₁`\n4. **参数更新**：`W₁ ← W₁ - η × ∂L/∂W₁`"
+    },
+    {
+      "type": "heading", "level": 2, "text": "数学工具全景回顾" },
+    {
+      "type": "decision_table",
+      "headers": ["ML 操作", "背后的数学", "本课章节"],
+      "rows": [
+        ["数据表示",           "向量、矩阵",              "第 9-10 章"],
+        ["模型参数",           "高维向量空间",             "第 10 章"],
+        ["前向传播",           "矩阵乘法 + 激活函数",      "第 9 章"],
+        ["损失函数",           "概率论 + 信息论（熵）",    "第 8、18 章"],
+        ["梯度计算",           "微积分（偏导数）",          "第 11 章"],
+        ["反向传播",           "链式法则",                 "第 11 章"],
+        ["参数更新",           "梯度下降（优化）",          "第 11 章"],
+        ["卷积神经网络",       "傅里叶变换（卷积定理）",   "第 13 章"],
+        ["Transformer 注意力", "点积（向量内积）",          "第 10 章"],
+        ["模型评估",           "统计假设检验",              "第 8 章"]
+      ],
+      "mnemonic": "**ML 不是黑魔法，每行代码背后都有章节可查。**"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n    \"math/rand\"\n)\n\n// 最小神经网络：1 个隐层，ReLU，梯度下降\n// 解决 XOR 问题（线性不可分，需要至少 1 个隐层）\n\nfunc relu(x float64) float64 { return math.Max(0, x) }\nfunc reluGrad(x float64) float64 { if x > 0 { return 1 }; return 0 }\nfunc sigmoid(x float64) float64 { return 1 / (1 + math.Exp(-x)) }\n\nfunc trainXOR() {\n    // 权重初始化（小随机值）\n    w1 := [2][2]float64{{rand.NormFloat64() * 0.5, rand.NormFloat64() * 0.5},\n        {rand.NormFloat64() * 0.5, rand.NormFloat64() * 0.5}}\n    b1 := [2]float64{0, 0}\n    w2 := [2]float64{rand.NormFloat64() * 0.5, rand.NormFloat64() * 0.5}\n    b2 := 0.0\n    lr := 0.5\n\n    // XOR 数据\n    X := [][2]float64{{0, 0}, {0, 1}, {1, 0}, {1, 1}}\n    Y := []float64{0, 1, 1, 0}\n\n    for epoch := 0; epoch < 5000; epoch++ {\n        totalLoss := 0.0\n        for d, x := range X {\n            // 前向传播\n            z1 := [2]float64{w1[0][0]*x[0] + w1[0][1]*x[1] + b1[0],\n                w1[1][0]*x[0] + w1[1][1]*x[1] + b1[1]}\n            a1 := [2]float64{relu(z1[0]), relu(z1[1])}\n            z2 := w2[0]*a1[0] + w2[1]*a1[1] + b2\n            yhat := sigmoid(z2)\n            y := Y[d]\n            totalLoss += -y*math.Log(yhat+1e-8) - (1-y)*math.Log(1-yhat+1e-8)\n\n            // 反向传播\n            dL_dyhat := (yhat - y) / (yhat * (1 - yhat) + 1e-8)\n            dyhat_dz2 := yhat * (1 - yhat)\n            dz2 := dL_dyhat * dyhat_dz2\n\n            w2[0] -= lr * dz2 * a1[0]\n            w2[1] -= lr * dz2 * a1[1]\n            b2 -= lr * dz2\n\n            for i := 0; i < 2; i++ {\n                da1 := dz2 * w2[i]\n                dz1 := da1 * reluGrad(z1[i])\n                w1[i][0] -= lr * dz1 * x[0]\n                w1[i][1] -= lr * dz1 * x[1]\n                b1[i] -= lr * dz1\n            }\n        }\n        if epoch%1000 == 999 {\n            fmt.Printf(\"Epoch %4d: loss=%.4f\\n\", epoch+1, totalLoss/4)\n        }\n    }\n\n    // 验证\n    fmt.Println(\"XOR 预测:\")\n    for _, x := range X {\n        z1 := [2]float64{w1[0][0]*x[0]+w1[0][1]*x[1]+b1[0], w1[1][0]*x[0]+w1[1][1]*x[1]+b1[1]}\n        a1 := [2]float64{relu(z1[0]), relu(z1[1])}\n        z2 := w2[0]*a1[0] + w2[1]*a1[1] + b2\n        fmt.Printf(\"  XOR(%v,%v) = %.3f\\n\", int(x[0]), int(x[1]), sigmoid(z2))\n    }\n}\n\nfunc main() { trainXOR() }"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "用 log-softmax + NLLLoss 代替 softmax + CrossEntropy——数值更稳定",
+        "梯度检验：数值梯度和解析梯度之差 < 1e-5 才算正确",
+        "理解每层输出的维度变化——维度错误是 bug 的最大来源"
+      ],
+      "dont": [
+        "用 MSE 做分类损失——交叉熵收敛更快，梯度更好",
+        "权重全初始化为 0——对称性导致所有神经元学到相同特征"
+      ],
+      "pitfalls": [
+        "学习率对不同参数层应该不同（Adam 的本质之一）——统一 lr 是近似"
+      ],
+      "criterion": "**判断标准**：能从零手写 XOR 神经网络的前向+反向传播，并看到它收敛 → 完成本课程。"
+    },
+    {
+      "type": "callout",
+      "tone": "tip",
+      "title": "学完这门课，你获得了什么",
+      "text": "不再对浮点 bug 感到神秘 → 不再对复杂度分析靠猜 → 不再对 ML 论文的数学望而却步。你有了一套可以生长的数学工具箱。下一步：《具体数学》、3Blue1Brown 的线代系列、MIT 18.06。"
+    },
+    {
+      "type": "quote",
+      "text": "数学是程序员的第二母语。你学会它的那一天，你的代码就有了灵魂。",
+      "by": "本课结语"
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "meta": {
+    "slug": "fibonacci",
+    "chapter": "CHAPTER 06",
+    "title": "斐波那契与递推数列",
+    "subtitle": "从兔子繁殖到黄金比例，从记忆化到矩阵快速幂",
+    "updated": "2026-05-25",
+    "reading_time": "12 分钟",
+    "audience": ["后端工程师", "算法入门者"],
+    "problems_solved": [
+      "递归计算斐波那契为什么指数级慢",
+      "如何 O(log n) 计算第 n 个斐波那契数",
+      "动态规划的状态转移方程从哪里来"
+    ],
+    "takeaways": [
+      "递推数列 = 状态 + 转移方程，DP 的本质",
+      "记忆化把指数递归降为线性",
+      "矩阵快速幂把线性 DP 降为 O(log n)"
+    ],
+    "breadcrumbs": ["程序猿数学课", "数列与计数", "斐波那契与递推数列"],
+    "prev": { "slug": "gcd", "title": "GCD 与 LCM：欧几里得算法" },
+    "next": { "slug": "combinatorics", "title": "排列组合：计数的艺术" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "斐波那契数列 F(n) = F(n-1) + F(n-2) 是最著名的递推数列。它在算法里的意义不是数列本身，而是它展示了从「指数暴力」到「线性 DP」再到「O(log n) 矩阵快速幂」的完整优化路径。"
+    },
+    {
+      "type": "principle",
+      "text": "递推 = 状态 + 转移。理解了斐波那契，你就理解了动态规划的骨架。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "四种实现：从 O(2ⁿ) 到 O(log n)" },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\n// 1. 朴素递归：O(2^n)，F(50) 需要计算 2^50 次\nfunc fibNaive(n int) int {\n    if n <= 1 { return n }\n    return fibNaive(n-1) + fibNaive(n-2)\n}\n\n// 2. 记忆化递归：O(n)\nfunc fibMemo(n int, memo map[int]int) int {\n    if n <= 1 { return n }\n    if v, ok := memo[n]; ok { return v }\n    memo[n] = fibMemo(n-1, memo) + fibMemo(n-2, memo)\n    return memo[n]\n}\n\n// 3. 迭代 DP：O(n) 时间，O(1) 空间\nfunc fibDP(n int) int {\n    if n <= 1 { return n }\n    a, b := 0, 1\n    for i := 2; i <= n; i++ {\n        a, b = b, a+b\n    }\n    return b\n}\n\n// 4. 矩阵快速幂：O(log n)\n// [F(n+1)]   [1 1]^n   [F(1)]\n// [F(n)  ] = [1 0]   × [F(0)]\ntype mat [2][2]int\n\nfunc matMul(a, b mat) mat {\n    var c mat\n    for i := 0; i < 2; i++ {\n        for j := 0; j < 2; j++ {\n            for k := 0; k < 2; k++ {\n                c[i][j] += a[i][k] * b[k][j]\n            }\n        }\n    }\n    return c\n}\n\nfunc matPow(m mat, n int) mat {\n    result := mat{{1, 0}, {0, 1}}  // 单位矩阵\n    for n > 0 {\n        if n&1 == 1 { result = matMul(result, m) }\n        m = matMul(m, m)\n        n >>= 1\n    }\n    return result\n}\n\nfunc fibMatrix(n int) int {\n    if n <= 1 { return n }\n    base := mat{{1, 1}, {1, 0}}\n    return matPow(base, n)[0][1]\n}\n\nfunc main() {\n    fmt.Println(fibDP(10))       // 55\n    fmt.Println(fibMatrix(10))   // 55\n    fmt.Println(fibMatrix(50))   // 12586269025\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "黄金比例与增长率" },
+    {
+      "type": "paragraph",
+      "text": "斐波那契数列的相邻比 F(n+1)/F(n) 趋近于黄金比例 `φ = (1+√5)/2 ≈ 1.618`。这可以用特征方程求解：`x² = x + 1`，解为 `φ = (1+√5)/2` 和 `ψ = (1-√5)/2`，通项公式为 `F(n) = (φⁿ - ψⁿ) / √5`。这个公式揭示了斐波那契数列**指数增长**的本质。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n)\n\nfunc main() {\n    phi := (1 + math.Sqrt(5)) / 2\n    psi := (1 - math.Sqrt(5)) / 2\n\n    // Binet 公式（浮点近似，大 n 会有误差）\n    binetFib := func(n int) int {\n        return int(math.Round((math.Pow(phi, float64(n)) - math.Pow(psi, float64(n))) / math.Sqrt(5)))\n    }\n\n    for i := 0; i <= 10; i++ {\n        fmt.Printf(\"F(%2d) = %d\\n\", i, binetFib(i))\n    }\n\n    // 相邻比趋近黄金比例\n    a, b := 1, 1\n    for i := 0; i < 10; i++ {\n        fmt.Printf(\"%.6f \", float64(b)/float64(a))\n        a, b = b, a+b\n    }\n    fmt.Println()  // 1.618... 越来越精确\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "递推数列的通用框架" },
+    {
+      "type": "paragraph",
+      "text": "所有**线性常系数递推**都可以用矩阵快速幂加速到 O(log n)。爬楼梯问题、Tribonacci、任意 k 阶线性递推，都套同一个框架：写出转移矩阵，用矩阵快速幂求第 n 个状态向量。"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "写递推时先想「状态是什么」再写转移方程",
+        "记忆化是把递归树剪掉重复子树的通用技巧",
+        "大 n 的线性递推用矩阵快速幂"
+      ],
+      "dont": [
+        "直接用 Binet 公式——浮点误差在 n>70 时显现",
+        "对每个递推问题都直接上矩阵——先写 O(n) DP，确认正确后再优化"
+      ],
+      "pitfalls": [
+        "矩阵乘法是 O(k³) 的，k 阶线性递推的矩阵快速幂是 O(k³ log n)"
+      ],
+      "criterion": "**判断标准**：能写出斐波那契的转移矩阵并解释为什么矩阵快速幂是 O(log n) → 掌握本章。"
+    },
+    {
+      "type": "quote",
+      "text": "斐波那契数列是数学里最美的意外——它从兔子繁殖开始，却贯穿了整个现代算法。",
+      "by": "具体数学"
+    }
+  ]
+}

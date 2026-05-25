@@ -1,0 +1,82 @@
+{
+  "meta": {
+    "slug": "probability",
+    "chapter": "CHAPTER 08",
+    "title": "概率论基础：随机的本质",
+    "subtitle": "哈希冲突、负载均衡、A/B 测试背后的数学",
+    "updated": "2026-05-25",
+    "reading_time": "14 分钟",
+    "audience": ["后端工程师", "数据工程师"],
+    "problems_solved": [
+      "哈希表的装载因子应该设多少",
+      "生日悖论为什么让碰撞比预期频繁",
+      "蒙特卡洛方法怎么用随机性逼近答案"
+    ],
+    "takeaways": [
+      "概率 = 有利事件数 / 样本空间大小（古典概型）",
+      "期望 E[X] = Σ x·P(X=x)，衡量随机变量的平均值",
+      "大数定律：样本均值依概率收敛到期望"
+    ],
+    "breadcrumbs": ["程序猿数学课", "数列与计数", "概率论基础"],
+    "prev": { "slug": "combinatorics", "title": "排列组合：计数的艺术" },
+    "next": { "slug": "matrix", "title": "矩阵运算：线性代数入门" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "概率论量化了不确定性。程序员每天遇到的随机负载、缓存命中率、A/B 测试显著性，都是概率问题。不懂概率，你只能凭感觉猜——懂了，你能精确计算风险和期望。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "基本概率与条件概率" },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math/rand\"\n)\n\n// 蒙特卡洛估算 π\n// 原理：单位圆面积 = π，单位正方形面积 = 4，比值 = π/4\nfunc estimatePi(n int) float64 {\n    inside := 0\n    for i := 0; i < n; i++ {\n        x := rand.Float64()*2 - 1\n        y := rand.Float64()*2 - 1\n        if x*x+y*y <= 1 {\n            inside++\n        }\n    }\n    return 4 * float64(inside) / float64(n)\n}\n\n// 模拟掷骰子，验证大数定律\nfunc diceMean(n int) float64 {\n    sum := 0\n    for i := 0; i < n; i++ {\n        sum += rand.Intn(6) + 1\n    }\n    return float64(sum) / float64(n)\n}\n\nfunc main() {\n    fmt.Printf(\"π ≈ %.5f (理论 3.14159)\\n\", estimatePi(1_000_000))\n\n    // 大数定律验证：骰子期望 = 3.5\n    for _, n := range []int{10, 100, 10000, 1000000} {\n        fmt.Printf(\"n=%7d: 均值=%.4f\\n\", n, diceMean(n))\n    }\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "生日悖论：碰撞比你想的早" },
+    {
+      "type": "paragraph",
+      "text": "「23 个人中有两个人生日相同的概率 > 50%」——这就是生日悖论。直觉上应该需要 183 人，但数学告诉我们只需要 23 人。原因：**碰撞发生在任意两人之间**，而不是你和某个特定人之间。这直接解释了为什么哈希表在装载率 70% 时冲突率就已经很显著了。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n)\n\n// 计算 k 个人中至少两人生日相同的概率\nfunc birthdayCollisionProb(k, n int) float64 {\n    // 所有人生日不同的概率\n    pNone := 1.0\n    for i := 0; i < k; i++ {\n        pNone *= float64(n-i) / float64(n)\n    }\n    return 1 - pNone\n}\n\n// 哈希表碰撞：m 个槽，n 个键，碰撞概率\nfunc hashCollisionProb(m, n int) float64 {\n    return birthdayCollisionProb(n, m)\n}\n\nfunc main() {\n    // 生日悖论：365 天，多少人时概率超 50%\n    for k := 1; k <= 30; k++ {\n        p := birthdayCollisionProb(k, 365)\n        if p > 0.5 {\n            fmt.Printf(\"%d 个人时概率首次超 50%%: %.1f%%\\n\", k, p*100)\n            break\n        }\n    }\n\n    // 哈希表：1024 个槽，放多少个键时碰撞概率超 10%？\n    for n := 1; n <= 1024; n++ {\n        if hashCollisionProb(1024, n) > 0.1 {\n            fmt.Printf(\"槽=1024，键=%d 时碰撞率>10%%\\n\", n)\n            break\n        }\n    }\n\n    // 近似公式：n ≈ sqrt(2m * ln(1/(1-p)))\n    approx := math.Sqrt(2 * 1024 * math.Log(1/(1-0.1)))\n    fmt.Printf(\"近似公式结果: %.0f\\n\", approx)\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "期望与方差：量化随机" },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n)\n\n// 离散随机变量的期望和方差\nfunc expectation(vals []float64, probs []float64) float64 {\n    e := 0.0\n    for i, v := range vals {\n        e += v * probs[i]\n    }\n    return e\n}\n\nfunc variance(vals []float64, probs []float64) float64 {\n    e := expectation(vals, probs)\n    v := 0.0\n    for i, x := range vals {\n        d := x - e\n        v += d * d * probs[i]\n    }\n    return v\n}\n\nfunc main() {\n    // 骰子\n    vals := []float64{1, 2, 3, 4, 5, 6}\n    probs := []float64{1.0 / 6, 1.0 / 6, 1.0 / 6, 1.0 / 6, 1.0 / 6, 1.0 / 6}\n    e := expectation(vals, probs)\n    v := variance(vals, probs)\n    fmt.Printf(\"期望=%.2f 方差=%.4f 标准差=%.4f\\n\", e, v, math.Sqrt(v))\n    // 期望=3.50 方差=2.9167 标准差=1.7078\n\n    // 缓存命中期望：命中率 0.8，单次查询期望 IO 次数\n    // 命中：0 次磁盘 IO，未命中：1 次磁盘 IO\n    hitRate := 0.8\n    expectedIO := 0*hitRate + 1*(1-hitRate)\n    fmt.Printf(\"命中率 80%% 时，每次查询期望 IO: %.1f 次\\n\", expectedIO)\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "贝叶斯定理：更新信念" },
+    {
+      "type": "paragraph",
+      "text": "贝叶斯定理 `P(A|B) = P(B|A)×P(A) / P(B)` 描述了如何用新证据更新概率估计。在垃圾邮件过滤、异常检测、医疗诊断中大量使用。==先验 × 似然 = 后验==（差一个归一化常数）。"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "哈希表负载因子控制在 0.7 以下（碰撞概率急剧上升前）",
+        "A/B 测试前先算所需样本量，而不是靠感觉",
+        "蒙特卡洛方法适用于高维积分、期权定价等解析解难求的场景"
+      ],
+      "dont": [
+        "把概率当百分比随意计算——注意独立性假设是否成立",
+        "忽视小概率大影响事件——期望值不是全部，方差也很重要"
+      ],
+      "pitfalls": [
+        "条件概率 P(A|B) ≠ P(B|A)——混淆两者叫做「检察官谬误」"
+      ],
+      "criterion": "**判断标准**：能计算哈希表碰撞概率并解释为什么负载因子不能太高 → 掌握本章。"
+    },
+    {
+      "type": "quote",
+      "text": "概率论是量化无知的科学——它不消除不确定性，它让你诚实地面对它。",
+      "by": "E.T. Jaynes《概率论：科学的逻辑》"
+    }
+  ]
+}

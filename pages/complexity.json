@@ -1,0 +1,90 @@
+{
+  "meta": {
+    "slug": "complexity",
+    "chapter": "CHAPTER 16",
+    "title": "算法复杂度：渐进分析",
+    "subtitle": "从主定理到 P vs NP，性能分析的数学语言",
+    "updated": "2026-05-25",
+    "reading_time": "12 分钟",
+    "audience": ["后端工程师", "算法工程师"],
+    "problems_solved": [
+      "如何推导归并排序是 O(n log n)",
+      "主定理适用的场景和不适用的场景",
+      "P 和 NP 对工程有什么实际影响"
+    ],
+    "takeaways": [
+      "大 O 表示渐进上界，忽略常数和低阶项",
+      "主定理处理 T(n) = aT(n/b) + f(n) 形式的递推",
+      "NP 完全问题没有已知的多项式时间算法——遇到就用近似或启发式"
+    ],
+    "breadcrumbs": ["程序猿数学课", "算法数学", "算法复杂度"],
+    "prev": { "slug": "tree", "title": "树与搜索：分层数据结构" },
+    "next": { "slug": "hash", "title": "哈希与密码学：安全的数学" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "算法复杂度是工程师和数学的语言共同协议。O(n log n) vs O(n²) 在 n=10⁶ 时意味着 1 秒 vs 11 天。不懂渐进分析，你只能靠基准测试猜——懂了，你能在设计阶段就预测性能。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "大 O、大 Ω、大 Θ" },
+    {
+      "type": "paragraph",
+      "text": "- `f(n) = O(g(n))`：存在 c, n₀，使 f(n) ≤ c·g(n)，n ≥ n₀（上界）\n- `f(n) = Ω(g(n))`：下界\n- `f(n) = Θ(g(n))`：上界且下界，精确渐进\n\n工程中说「复杂度是 O(n log n)」通常指 Θ(n log n)——上下界都卡住了。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"sort\"\n    \"time\"\n)\n\n// O(n²) 冒泡排序 vs O(n log n) 标准库排序\nfunc bubbleSort(arr []int) {\n    n := len(arr)\n    for i := 0; i < n-1; i++ {\n        for j := 0; j < n-i-1; j++ {\n            if arr[j] > arr[j+1] {\n                arr[j], arr[j+1] = arr[j+1], arr[j]\n            }\n        }\n    }\n}\n\nfunc benchmark(n int) {\n    data1 := make([]int, n)\n    data2 := make([]int, n)\n    for i := range data1 {\n        data1[i] = n - i\n        data2[i] = n - i\n    }\n\n    t1 := time.Now()\n    if n <= 10000 {\n        bubbleSort(data1)\n    }\n    d1 := time.Since(t1)\n\n    t2 := time.Now()\n    sort.Ints(data2)\n    d2 := time.Since(t2)\n\n    if n <= 10000 {\n        fmt.Printf(\"n=%6d: 冒泡=%v 快排=%v 比值=%.0fx\\n\",\n            n, d1, d2, float64(d1)/float64(d2))\n    } else {\n        fmt.Printf(\"n=%6d: 快排=%v（冒泡跳过，太慢）\\n\", n, d2)\n    }\n}\n\nfunc main() {\n    for _, n := range []int{1000, 5000, 10000, 100000, 1000000} {\n        benchmark(n)\n    }\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "主定理：推导分治算法的复杂度" },
+    {
+      "type": "paragraph",
+      "text": "形如 `T(n) = aT(n/b) + f(n)` 的递推关系（a 个规模 n/b 的子问题，每层合并代价 f(n)），主定理给出三种情况：\n\n1. f(n) = O(n^{log_b a - ε})：合并代价被子问题主导，T(n) = Θ(n^{log_b a})\n2. f(n) = Θ(n^{log_b a})：同阶，T(n) = Θ(n^{log_b a} log n)\n3. f(n) = Ω(n^{log_b a + ε})：合并代价主导，T(n) = Θ(f(n))"
+    },
+    {
+      "type": "decision_table",
+      "headers": ["算法", "递推式", "主定理情况", "结果"],
+      "rows": [
+        ["归并排序",    "T(n)=2T(n/2)+O(n)",    "情况 2",  "O(n log n)"],
+        ["二分查找",    "T(n)=T(n/2)+O(1)",     "情况 2",  "O(log n)"],
+        ["Karatsuba 大整数乘法", "T(n)=3T(n/2)+O(n)", "情况 1", "O(n^1.585)"],
+        ["斯特拉森矩阵乘法", "T(n)=7T(n/2)+O(n²)", "情况 1", "O(n^2.81)"]
+      ],
+      "mnemonic": "**子问题个数 a，规模缩小 b，合并代价 f(n)——三者比较定胜负。**"
+    },
+    {
+      "type": "heading", "level": 2, "text": "摊还分析：动态数组的 O(1) 均摊" },
+    {
+      "type": "paragraph",
+      "text": "动态数组（Go 的 slice）每次扩容复制所有元素，代价 O(n)。但每次追加是 O(1)。**摊还分析**证明：n 次追加的总代价是 O(n)，均摊每次 O(1)。分析技巧：势能函数法——把扩容的代价「借给」之前的 O(1) 操作分摊还清。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\n// 手动实现动态数组，观察扩容时机\ntype DynArray struct {\n    data     []int\n    size     int\n    copyOps  int  // 记录总复制操作数\n}\n\nfunc (d *DynArray) Append(v int) {\n    if d.size == len(d.data) {\n        // 扩容：容量翻倍\n        newData := make([]int, max(1, len(d.data)*2))\n        copy(newData, d.data)\n        d.copyOps += d.size  // 记录这次扩容的代价\n        d.data = newData\n    }\n    d.data[d.size] = v\n    d.size++\n}\n\nfunc max(a, b int) int {\n    if a > b { return a }\n    return b\n}\n\nfunc main() {\n    d := &DynArray{}\n    n := 1024\n    for i := 0; i < n; i++ {\n        d.Append(i)\n    }\n    fmt.Printf(\"追加 %d 次，总复制操作: %d，均摊: %.1f 次/追加\\n\",\n        n, d.copyOps, float64(d.copyOps)/float64(n))\n    // 追加 1024 次，总复制操作: 1023，均摊: ~1.0 次/追加\n}"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "分析复杂度时先写递推式，再用主定理或展开法求解",
+        "NP 完全问题（TSP、背包）用近似算法或启发式（模拟退火）",
+        "摊还分析适合批量操作，看总代价而非单次最坏"
+      ],
+      "dont": [
+        "混淆最坏情况和平均情况——快速排序平均 O(n log n)，最坏 O(n²)",
+        "认为 O(n) 一定比 O(n log n) 快——常数因子在小 n 时影响更大"
+      ],
+      "pitfalls": [
+        "主定理不适用于 T(n) = 2T(n/2) + O(n log n)——需要用 Akra-Bazzi 定理"
+      ],
+      "criterion": "**判断标准**：能用主定理推导归并排序的 O(n log n) → 掌握本章。"
+    },
+    {
+      "type": "quote",
+      "text": "O 记号是工程师的望远镜——它让你看到算法在无限大时的形状。",
+      "by": "算法导论"
+    }
+  ]
+}

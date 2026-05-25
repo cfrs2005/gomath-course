@@ -1,0 +1,75 @@
+{
+  "site": {
+    "name": "程序猿数学课：用 Go 学数学",
+    "subdomain": "gomath",
+    "brand": "80AJ",
+    "home": "https://www.80aj.com",
+    "description": "20 章用 Go 代码打通的程序员数学体系，从整数到机器学习",
+    "default_theme": "tech-book",
+    "themes": ["tech-book", "magazine", "handwritten", "rainbow"],
+    "show_search": true,
+    "show_theme_switcher": true
+  },
+  "nav": [
+    {
+      "group": "开篇",
+      "items": [
+        { "slug": "index", "title": "为什么程序猿要学数学" }
+      ]
+    },
+    {
+      "group": "数论基础",
+      "items": [
+        { "slug": "integers",    "title": "整数与浮点：数的真相" },
+        { "slug": "binary",      "title": "进制与位运算：二进制魔法" },
+        { "slug": "modular",     "title": "模运算与同余：时钟数学" },
+        { "slug": "primes",      "title": "素数与因式分解：数的基石" },
+        { "slug": "gcd",         "title": "GCD 与 LCM：欧几里得算法" }
+      ]
+    },
+    {
+      "group": "数列与计数",
+      "items": [
+        { "slug": "fibonacci",      "title": "斐波那契与递推数列" },
+        { "slug": "combinatorics",  "title": "排列组合：计数的艺术" },
+        { "slug": "probability",    "title": "概率论基础：随机的本质" }
+      ]
+    },
+    {
+      "group": "线性代数",
+      "items": [
+        { "slug": "matrix", "title": "矩阵运算：线性代数入门" },
+        { "slug": "vector", "title": "向量与空间变换" }
+      ]
+    },
+    {
+      "group": "分析数学",
+      "items": [
+        { "slug": "calculus",  "title": "极限与导数：微积分入门" },
+        { "slug": "integral",  "title": "积分：累积的思想" },
+        { "slug": "fourier",   "title": "傅里叶变换：频域的世界" }
+      ]
+    },
+    {
+      "group": "图与结构",
+      "items": [
+        { "slug": "graph", "title": "图论基础：连接的数学" },
+        { "slug": "tree",  "title": "树与搜索：分层数据结构" }
+      ]
+    },
+    {
+      "group": "算法数学",
+      "items": [
+        { "slug": "complexity", "title": "算法复杂度：渐进分析" },
+        { "slug": "hash",       "title": "哈希与密码学：安全的数学" }
+      ]
+    },
+    {
+      "group": "应用前沿",
+      "items": [
+        { "slug": "information", "title": "信息论与熵" },
+        { "slug": "ml-math",     "title": "机器学习中的数学" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "meta": {
+    "slug": "vector",
+    "chapter": "CHAPTER 10",
+    "title": "向量与空间变换",
+    "subtitle": "点积、叉积、旋转矩阵——图形学和 ML 的空间直觉",
+    "updated": "2026-05-25",
+    "reading_time": "12 分钟",
+    "audience": ["图形学开发者", "ML 工程师", "游戏开发者"],
+    "problems_solved": [
+      "点积为什么能衡量相似度",
+      "旋转和缩放用矩阵怎么表达",
+      "向量嵌入（embedding）的几何含义是什么"
+    ],
+    "takeaways": [
+      "点积 a·b = |a||b|cosθ，余弦相似度由此来",
+      "叉积 a×b 产生垂直于 a、b 平面的向量，用于法向量计算",
+      "空间变换（旋转、缩放、平移）都是矩阵乘法"
+    ],
+    "breadcrumbs": ["程序猿数学课", "线性代数", "向量与空间变换"],
+    "prev": { "slug": "matrix", "title": "矩阵运算：线性代数入门" },
+    "next": { "slug": "calculus", "title": "极限与导数：微积分入门" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "向量是有方向的量——它既是物理意义上的「箭头」，也是机器学习里的「特征向量」。掌握点积、叉积和变换矩阵，你就有了理解图形渲染管线和 embedding 相似度的完整工具。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "向量基本运算" },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n)\n\ntype Vec3 struct{ X, Y, Z float64 }\n\nfunc (a Vec3) Add(b Vec3) Vec3 { return Vec3{a.X + b.X, a.Y + b.Y, a.Z + b.Z} }\nfunc (a Vec3) Scale(s float64) Vec3 { return Vec3{a.X * s, a.Y * s, a.Z * s} }\nfunc (a Vec3) Len() float64 { return math.Sqrt(a.X*a.X + a.Y*a.Y + a.Z*a.Z) }\nfunc (a Vec3) Normalize() Vec3 { return a.Scale(1 / a.Len()) }\n\n// 点积：a·b = ax*bx + ay*by + az*bz = |a||b|cosθ\nfunc (a Vec3) Dot(b Vec3) float64 { return a.X*b.X + a.Y*b.Y + a.Z*b.Z }\n\n// 叉积：a×b，垂直于 a 和 b 所在平面\nfunc (a Vec3) Cross(b Vec3) Vec3 {\n    return Vec3{\n        a.Y*b.Z - a.Z*b.Y,\n        a.Z*b.X - a.X*b.Z,\n        a.X*b.Y - a.Y*b.X,\n    }\n}\n\n// 余弦相似度（ML embedding 相似度）\nfunc CosineSim(a, b Vec3) float64 {\n    return a.Dot(b) / (a.Len() * b.Len())\n}\n\nfunc main() {\n    v1 := Vec3{1, 0, 0}  // X 轴正方向\n    v2 := Vec3{0, 1, 0}  // Y 轴正方向\n\n    fmt.Println(v1.Dot(v2))   // 0（垂直）\n    fmt.Println(v1.Cross(v2)) // {0 0 1}（Z 轴，右手定则）\n\n    // embedding 相似度\n    word1 := Vec3{0.9, 0.1, 0.2}  // \"king\" 的 embedding\n    word2 := Vec3{0.8, 0.2, 0.3}  // \"queen\" 的 embedding\n    fmt.Printf(\"相似度: %.4f\\n\", CosineSim(word1, word2))\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "2D 旋转矩阵" },
+    {
+      "type": "paragraph",
+      "text": "绕原点旋转角度 θ 的变换：`x' = x cosθ - y sinθ`，`y' = x sinθ + y cosθ`。写成矩阵形式就是旋转矩阵 R(θ)。**组合变换 = 矩阵连乘**，先旋转后平移 ≠ 先平移后旋转。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n)\n\ntype Vec2 struct{ X, Y float64 }\n\n// 2D 旋转：逆时针 angle 弧度\nfunc Rotate2D(v Vec2, angle float64) Vec2 {\n    cos, sin := math.Cos(angle), math.Sin(angle)\n    return Vec2{\n        X: v.X*cos - v.Y*sin,\n        Y: v.X*sin + v.Y*cos,\n    }\n}\n\n// 2D 缩放\nfunc Scale2D(v Vec2, sx, sy float64) Vec2 {\n    return Vec2{v.X * sx, v.Y * sy}\n}\n\nfunc main() {\n    p := Vec2{1, 0}  // X 轴上的点\n\n    // 旋转 90 度\n    rotated := Rotate2D(p, math.Pi/2)\n    fmt.Printf(\"旋转 90°: (%.4f, %.4f)\\n\", rotated.X, rotated.Y)  // (0, 1)\n\n    // 旋转 45 度\n    r45 := Rotate2D(p, math.Pi/4)\n    fmt.Printf(\"旋转 45°: (%.4f, %.4f)\\n\", r45.X, r45.Y)  // (0.7071, 0.7071)\n\n    // 组合：先缩放 2 倍，再旋转 30 度\n    scaled := Scale2D(p, 2, 2)\n    combined := Rotate2D(scaled, math.Pi/6)\n    fmt.Printf(\"缩放+旋转: (%.4f, %.4f)\\n\", combined.X, combined.Y)\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "齐次坐标：统一平移" },
+    {
+      "type": "paragraph",
+      "text": "平移不是线性变换（不保持原点不动），所以不能用 2×2 矩阵表示。**齐次坐标**给每个 2D 点加第三维 w=1，升维到 3×3 矩阵，平移就变成了线性变换。这是图形渲染管线（OpenGL/Vulkan）里所有变换用 4×4 矩阵的原因。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\n// 3x3 齐次变换矩阵（2D 用）\ntype Mat3 [3][3]float64\n\nfunc (m Mat3) Apply(x, y float64) (float64, float64) {\n    // [a b c] [x]   [ax+by+c]\n    // [d e f] [y] = [dx+ey+f]\n    // [0 0 1] [1]   [1      ]\n    xOut := m[0][0]*x + m[0][1]*y + m[0][2]\n    yOut := m[1][0]*x + m[1][1]*y + m[1][2]\n    return xOut, yOut\n}\n\n// 平移矩阵\nfunc Translation(tx, ty float64) Mat3 {\n    return Mat3{{1, 0, tx}, {0, 1, ty}, {0, 0, 1}}\n}\n\nfunc main() {\n    t := Translation(3, 4)\n    x, y := t.Apply(1, 1)\n    fmt.Printf(\"(1,1) 平移 (3,4) 后: (%.0f, %.0f)\\n\", x, y)  // (4, 5)\n}"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "点积检查向量方向关系：>0 同向，=0 垂直，<0 反向",
+        "余弦相似度用于 embedding 比较时先归一化",
+        "复杂变换用矩阵连乘，顺序从右到左"
+      ],
+      "dont": [
+        "叉积只在 3D 中有意义（2D 的「叉积」是标量）",
+        "混淆行向量和列向量——明确约定统一用列向量"
+      ],
+      "pitfalls": [
+        "旋转矩阵组合时，矩阵乘法不可交换——先旋转再平移 ≠ 先平移再旋转"
+      ],
+      "criterion": "**判断标准**：能解释为什么 cosine similarity 衡量方向相似而非距离 → 掌握本章。"
+    },
+    {
+      "type": "quote",
+      "text": "向量是数学对方向的尊重——不只有大小，还有去向。",
+      "by": "3Blue1Brown《线性代数的本质》"
+    }
+  ]
+}

@@ -1,0 +1,87 @@
+{
+  "meta": {
+    "slug": "fourier",
+    "chapter": "CHAPTER 13",
+    "title": "傅里叶变换：频域的世界",
+    "subtitle": "音频压缩、信号滤波、卷积神经网络的数学基础",
+    "updated": "2026-05-25",
+    "reading_time": "14 分钟",
+    "audience": ["音频/信号处理开发者", "ML 工程师", "好奇心驱动的程序员"],
+    "problems_solved": [
+      "MP3 压缩为什么能把文件缩小 10 倍",
+      "FFT 为什么是 O(n log n) 而不是 O(n²)",
+      "卷积在频域为什么变成了乘法"
+    ],
+    "takeaways": [
+      "任何信号都能分解为不同频率正弦波的叠加",
+      "DFT 的矩阵计算是 O(n²)，FFT 通过分治降到 O(n log n)",
+      "频域卷积定理：时域卷积 = 频域点乘"
+    ],
+    "breadcrumbs": ["程序猿数学课", "分析数学", "傅里叶变换"],
+    "prev": { "slug": "integral", "title": "积分：累积的思想" },
+    "next": { "slug": "graph", "title": "图论基础：连接的数学" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "傅里叶变换把信号从时域（波形随时间变化）变换到频域（每个频率的振幅和相位）。==每个复杂的信号都是简单正弦波的叠加==。这个洞见让音频压缩、图像处理、无线通信成为可能。"
+    },
+    {
+      "type": "principle",
+      "text": "时域的卷积 = 频域的乘法。这个定理是信号处理最重要的计算加速工具。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "离散傅里叶变换（DFT）" },
+    {
+      "type": "paragraph",
+      "text": "DFT 把 N 个时域采样变换为 N 个频域系数：`X[k] = Σ_{n=0}^{N-1} x[n] × e^{-2πi·kn/N}`。朴素实现是 O(N²)，因为每个频率系数需要与所有 N 个时域样本做点积。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n    \"math/cmplx\"\n)\n\n// 朴素 DFT：O(N²)\nfunc dft(x []float64) []complex128 {\n    N := len(x)\n    X := make([]complex128, N)\n    for k := 0; k < N; k++ {\n        for n := 0; n < N; n++ {\n            angle := -2 * math.Pi * float64(k*n) / float64(N)\n            X[k] += complex(x[n], 0) * cmplx.Exp(complex(0, angle))\n        }\n    }\n    return X\n}\n\n// Cooley-Tukey FFT：O(N log N)，N 必须是 2 的幂\nfunc fft(x []complex128) []complex128 {\n    N := len(x)\n    if N <= 1 {\n        return x\n    }\n    // 分治：偶数下标和奇数下标\n    even := make([]complex128, N/2)\n    odd := make([]complex128, N/2)\n    for i := 0; i < N/2; i++ {\n        even[i] = x[2*i]\n        odd[i] = x[2*i+1]\n    }\n    E := fft(even)\n    O := fft(odd)\n    result := make([]complex128, N)\n    for k := 0; k < N/2; k++ {\n        t := cmplx.Exp(complex(0, -2*math.Pi*float64(k)/float64(N))) * O[k]\n        result[k] = E[k] + t\n        result[k+N/2] = E[k] - t\n    }\n    return result\n}\n\nfunc main() {\n    // 合成信号：5Hz + 10Hz 正弦波\n    N := 64\n    signal := make([]float64, N)\n    for i := range signal {\n        t := float64(i) / float64(N)\n        signal[i] = math.Sin(2*math.Pi*5*t) + 0.5*math.Sin(2*math.Pi*10*t)\n    }\n\n    // FFT\n    cx := make([]complex128, N)\n    for i, v := range signal { cx[i] = complex(v, 0) }\n    X := fft(cx)\n\n    // 找主要频率分量\n    fmt.Println(\"主要频率分量（振幅 > 0.1N）:\")\n    for k := 0; k < N/2; k++ {\n        amp := cmplx.Abs(X[k])\n        if amp > 0.1*float64(N) {\n            fmt.Printf(\"  频率 %2d Hz: 振幅 = %.1f\\n\", k, amp/float64(N)*2)\n        }\n    }\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "卷积定理与音频处理" },
+    {
+      "type": "paragraph",
+      "text": "时域卷积 `(f * g)[n] = Σ f[m]g[n-m]` 的复杂度是 O(N²)，但在频域只是点乘：`FFT(f * g) = FFT(f) × FFT(g)`。所以大卷积的算法是：**FFT → 点乘 → IFFT**，复杂度降到 O(N log N)。音频均衡器、图像模糊、CNN 的卷积层都用这个技巧。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n    \"math/cmplx\"\n)\n\n// 用 FFT 做快速多项式乘法（卷积定理的应用）\n// a = [1,2,3]，b = [4,5,6]，求 a*b 展开系数\nfunc polyMul(a, b []float64) []float64 {\n    // 补零到 2 的幂次\n    n := 1\n    for n < len(a)+len(b) { n <<= 1 }\n\n    ca := make([]complex128, n)\n    cb := make([]complex128, n)\n    for i, v := range a { ca[i] = complex(v, 0) }\n    for i, v := range b { cb[i] = complex(v, 0) }\n\n    fa := fft(ca)\n    fb := fft(cb)\n\n    // 频域点乘\n    fc := make([]complex128, n)\n    for i := range fc { fc[i] = fa[i] * fb[i] }\n\n    // IFFT（反转后 FFT 再除以 n）\n    for i := 1; i < n/2; i++ { fc[i], fc[n-i] = fc[n-i], fc[i] }\n    result := fft(fc)\n    out := make([]float64, len(a)+len(b)-1)\n    for i := range out {\n        out[i] = math.Round(real(result[i])/float64(n)*10) / 10\n    }\n    return out\n}\n\nfunc fft(x []complex128) []complex128 {\n    N := len(x)\n    if N <= 1 { return x }\n    even, odd := make([]complex128, N/2), make([]complex128, N/2)\n    for i := 0; i < N/2; i++ { even[i] = x[2*i]; odd[i] = x[2*i+1] }\n    E, O := fft(even), fft(odd)\n    res := make([]complex128, N)\n    for k := 0; k < N/2; k++ {\n        t := cmplx.Exp(complex(0, -2*math.Pi*float64(k)/float64(N))) * O[k]\n        res[k] = E[k] + t\n        res[k+N/2] = E[k] - t\n    }\n    return res\n}\n\nfunc main() {\n    // (1 + 2x + 3x²)(4 + 5x + 6x²) = 4 + 13x + 28x² + 27x³ + 18x⁴\n    result := polyMul([]float64{1, 2, 3}, []float64{4, 5, 6})\n    fmt.Println(result)  // [4 13 28 27 18]\n}"
+    },
+    {
+      "type": "decision_table",
+      "headers": ["算法", "时域运算", "频域运算", "总复杂度"],
+      "rows": [
+        ["朴素卷积",  "O(N²)",      "—",           "O(N²)"],
+        ["FFT 卷积",  "O(N log N)", "O(N)",        "O(N log N)"],
+        ["MP3 压缩", "—",          "丢弃高频分量", "10:1 压缩比"]
+      ],
+      "mnemonic": "**时域复杂，频域简单——傅里叶变换是把难题搬到容易的空间里解。**"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "音频/图像处理优先考虑频域算法",
+        "FFT 输入长度填充到 2 的幂次，性能最优",
+        "用 FFTW 或 gonum/dsp 等库而非手写"
+      ],
+      "dont": [
+        "对非周期信号直接用 DFT——需要加窗函数减少频谱泄漏",
+        "把 FFT 输出的 DC 分量（k=0）和信号频率混淆"
+      ],
+      "pitfalls": [
+        "FFT 输出的后半段（k > N/2）是前半段的镜像（Nyquist 定理）"
+      ],
+      "criterion": "**判断标准**：能解释为什么 FFT 是 O(N log N) 而 DFT 是 O(N²) → 掌握本章。"
+    },
+    {
+      "type": "quote",
+      "text": "傅里叶的洞见：任何信号都是正弦波的叠加。这一句话改变了整个现代通信。",
+      "by": "The Fourier Transform and Its Applications"
+    }
+  ]
+}

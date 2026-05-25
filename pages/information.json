@@ -1,0 +1,79 @@
+{
+  "meta": {
+    "slug": "information",
+    "chapter": "CHAPTER 18",
+    "title": "信息论与熵",
+    "subtitle": "香农熵、Huffman 编码、交叉熵损失的数学本质",
+    "updated": "2026-05-25",
+    "reading_time": "12 分钟",
+    "audience": ["ML 工程师", "数据压缩工程师", "对信息本质好奇的程序员"],
+    "problems_solved": [
+      "压缩算法为什么不能无限压缩",
+      "机器学习的交叉熵损失函数从哪里来",
+      "为什么不确定性越高，熵越大"
+    ],
+    "takeaways": [
+      "香农熵 H(X) = -Σ p(x) log₂ p(x)，是信息量的下界",
+      "Huffman 编码是最优的无损变长编码",
+      "交叉熵 = 熵 + KL 散度，衡量分布之间的差异"
+    ],
+    "breadcrumbs": ["程序猿数学课", "应用前沿", "信息论与熵"],
+    "prev": { "slug": "hash", "title": "哈希与密码学：安全的数学" },
+    "next": { "slug": "ml-math", "title": "机器学习中的数学" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "信息论回答「信息有多少」。香农在 1948 年用数学定义了信息量——一个事件的信息量 = `log₂(1/p)`，越意外的事件携带越多信息。这个洞见统一了压缩算法和机器学习的损失函数。"
+    },
+    {
+      "type": "principle",
+      "text": "熵是随机变量不确定性的度量：分布越均匀，熵越高；分布越集中，熵越低。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "香农熵：信息量的下界" },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n)\n\n// 香农熵：H(X) = -Σ p(x) log₂ p(x)\nfunc entropy(probs []float64) float64 {\n    h := 0.0\n    for _, p := range probs {\n        if p > 0 {\n            h -= p * math.Log2(p)\n        }\n    }\n    return h\n}\n\n// KL 散度：D_KL(P||Q) = Σ p(x) log(p(x)/q(x))\n// 衡量 P 和 Q 的差异（非对称！）\nfunc klDivergence(p, q []float64) float64 {\n    kl := 0.0\n    for i := range p {\n        if p[i] > 0 {\n            kl += p[i] * math.Log(p[i]/q[i])\n        }\n    }\n    return kl\n}\n\n// 交叉熵：H(P,Q) = H(P) + D_KL(P||Q) = -Σ p(x) log q(x)\n// 机器学习的分类损失函数\nfunc crossEntropy(trueLabels, predicted []float64) float64 {\n    ce := 0.0\n    for i := range trueLabels {\n        if trueLabels[i] > 0 {\n            ce -= trueLabels[i] * math.Log(predicted[i])\n        }\n    }\n    return ce\n}\n\nfunc main() {\n    // 均匀分布：熵最大\n    uniform := []float64{0.25, 0.25, 0.25, 0.25}\n    fmt.Printf(\"均匀分布熵: %.4f bits（最大）\\n\", entropy(uniform))\n\n    // 确定性分布：熵为 0\n    certain := []float64{1.0, 0, 0, 0}\n    fmt.Printf(\"确定性分布熵: %.4f bits（最小）\\n\", entropy(certain))\n\n    // 英语字母分布（近似）：熵 ≈ 4.18 bits < log₂(26) = 4.7 bits\n    // 这正是为什么英文可以压缩\n    skewed := []float64{0.4, 0.3, 0.2, 0.1}\n    fmt.Printf(\"偏斜分布熵: %.4f bits\\n\", entropy(skewed))\n\n    // 交叉熵损失：真实标签 [1,0,0]，预测 [0.7,0.2,0.1]\n    truth := []float64{1, 0, 0}\n    pred := []float64{0.7, 0.2, 0.1}\n    fmt.Printf(\"交叉熵损失: %.4f\\n\", crossEntropy(truth, pred))\n    // 预测 [0.9,0.05,0.05] 时损失更小：\n    pred2 := []float64{0.9, 0.05, 0.05}\n    fmt.Printf(\"更好预测的损失: %.4f\\n\", crossEntropy(truth, pred2))\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "Huffman 编码：最优前缀码" },
+    {
+      "type": "paragraph",
+      "text": "Huffman 编码是==无损压缩的理论最优==：出现频率高的字符用短编码，频率低的用长编码。平均码长接近香农熵下界。ZIP、gzip、JPEG 的熵编码阶段都用它（或变体）。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"container/heap\"\n    \"fmt\"\n)\n\ntype HNode struct {\n    char        rune\n    freq        int\n    left, right *HNode\n}\n\ntype HHeap []*HNode\n\nfunc (h HHeap) Len() int            { return len(h) }\nfunc (h HHeap) Less(i, j int) bool  { return h[i].freq < h[j].freq }\nfunc (h HHeap) Swap(i, j int)       { h[i], h[j] = h[j], h[i] }\nfunc (h *HHeap) Push(x interface{}) { *h = append(*h, x.(*HNode)) }\nfunc (h *HHeap) Pop() interface{}   { old := *h; n := len(old); x := old[n-1]; *h = old[:n-1]; return x }\n\nfunc buildHuffman(freq map[rune]int) *HNode {\n    h := &HHeap{}\n    for ch, f := range freq {\n        heap.Push(h, &HNode{char: ch, freq: f})\n    }\n    for h.Len() > 1 {\n        l := heap.Pop(h).(*HNode)\n        r := heap.Pop(h).(*HNode)\n        heap.Push(h, &HNode{freq: l.freq + r.freq, left: l, right: r})\n    }\n    return heap.Pop(h).(*HNode)\n}\n\nfunc buildCodes(node *HNode, prefix string, codes map[rune]string) {\n    if node == nil { return }\n    if node.left == nil && node.right == nil {\n        codes[node.char] = prefix\n        return\n    }\n    buildCodes(node.left, prefix+\"0\", codes)\n    buildCodes(node.right, prefix+\"1\", codes)\n}\n\nfunc main() {\n    text := \"abracadabra\"\n    freq := map[rune]int{}\n    for _, c := range text { freq[c]++ }\n\n    root := buildHuffman(freq)\n    codes := map[rune]string{}\n    buildCodes(root, \"\", codes)\n\n    fmt.Println(\"Huffman 编码:\")\n    totalBits := 0\n    for ch, code := range codes {\n        bits := len(code) * freq[ch]\n        totalBits += bits\n        fmt.Printf(\"  '%c'(freq=%d): %s (%d bits)\\n\", ch, freq[ch], code, bits)\n    }\n    fmt.Printf(\"总位数: %d（固定 3bit 编码需 %d 位）\\n\", totalBits, len(text)*3)\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "信息论的香农极限" },
+    {
+      "type": "paragraph",
+      "text": "**香农信源编码定理**：无损压缩的极限是信源的熵。英文文本的熵约 1.3 bits/字符（而非 ASCII 的 8 bits），这是 gzip 能压缩到 12% 的数学根基。==任何无损压缩算法都不能低于这个极限==——这是信息论给出的绝对下界。"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "用交叉熵作为多分类损失函数（标准做法）",
+        "用 KL 散度衡量两个概率分布的差异",
+        "评估压缩算法的上限前先估算数据的熵"
+      ],
+      "dont": [
+        "试图无损压缩随机数据——熵最大，无法压缩",
+        "把 KL 散度当距离用——它不满足对称性"
+      ],
+      "pitfalls": [
+        "交叉熵损失中预测值不能为 0——需要数值稳定处理（加 ε 或用 log-softmax）"
+      ],
+      "criterion": "**判断标准**：能解释为什么机器学习用交叉熵而非 MSE 做分类损失 → 掌握本章。"
+    },
+    {
+      "type": "quote",
+      "text": "信息就是惊讶。最意外的消息，承载最多信息。",
+      "by": "Claude Shannon, 1948"
+    }
+  ]
+}

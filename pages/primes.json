@@ -1,0 +1,94 @@
+{
+  "meta": {
+    "slug": "primes",
+    "chapter": "CHAPTER 04",
+    "title": "素数与因式分解：数的基石",
+    "subtitle": "密码学、哈希、随机数的数论根基",
+    "updated": "2026-05-25",
+    "reading_time": "12 分钟",
+    "audience": ["后端工程师", "对密码学感兴趣的开发者"],
+    "problems_solved": [
+      "如何高效判断一个大数是否是素数",
+      "埃拉托斯特尼筛法的原理是什么",
+      "RSA 加密为什么依赖大数分解困难"
+    ],
+    "takeaways": [
+      "每个正整数都能唯一分解为素数的乘积（算术基本定理）",
+      "埃氏筛法 O(n log log n) 批量生成素数",
+      "Miller-Rabin 概率测试用于检验大素数"
+    ],
+    "breadcrumbs": ["程序猿数学课", "数论基础", "素数与因式分解"],
+    "prev": { "slug": "modular", "title": "模运算与同余：时钟数学" },
+    "next": { "slug": "gcd", "title": "GCD 与 LCM：欧几里得算法" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "素数是乘法意义下的「原子」——它们不能被进一步分解。**算术基本定理**告诉我们：每个大于 1 的正整数都能唯一写成素数的乘积。这个「唯一分解」的性质，是 RSA 加密的安全基础。"
+    },
+    {
+      "type": "principle",
+      "text": "算术基本定理：每个整数 n > 1 都有唯一的素数分解 n = p₁^a₁ × p₂^a₂ × ... × pₖ^aₖ。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "朴素判素法与优化" },
+    {
+      "type": "paragraph",
+      "text": "最直接的判素法：从 2 试除到 n-1。但我们只需要试到 `√n`——因为如果 n 有因子 d，那么 n/d 也是因子，d 和 n/d 中至少一个 ≤ √n。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n)\n\n// 朴素判素：O(√n)\nfunc isPrime(n int) bool {\n    if n < 2 { return false }\n    if n == 2 { return true }\n    if n%2 == 0 { return false }\n    sqrtN := int(math.Sqrt(float64(n)))\n    for i := 3; i <= sqrtN; i += 2 {\n        if n%i == 0 { return false }\n    }\n    return true\n}\n\n// 试除法分解质因数\nfunc factorize(n int) map[int]int {\n    factors := map[int]int{}\n    for p := 2; p*p <= n; p++ {\n        for n%p == 0 {\n            factors[p]++\n            n /= p\n        }\n    }\n    if n > 1 {\n        factors[n]++\n    }\n    return factors\n}\n\nfunc main() {\n    fmt.Println(isPrime(17), isPrime(18))  // true false\n    fmt.Println(factorize(360))  // map[2:3 3:2 5:1]  360=2³×3²×5\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "埃拉托斯特尼筛法：批量生成素数" },
+    {
+      "type": "paragraph",
+      "text": "埃氏筛法的思路：从 2 开始，把每个素数的倍数标记为合数。时间复杂度 `O(n log log n)`，是生成 1 到 n 所有素数的最快实用算法。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\n// 埃拉托斯特尼筛法：返回 [2, n] 内的所有素数\nfunc sieve(n int) []int {\n    isComposite := make([]bool, n+1)\n    primes := []int{}\n    for i := 2; i <= n; i++ {\n        if isComposite[i] {\n            continue\n        }\n        primes = append(primes, i)\n        // 从 i² 开始标记（i 以下的倍数已被更小的素数标记过）\n        for j := i * i; j <= n; j += i {\n            isComposite[j] = true\n        }\n    }\n    return primes\n}\n\nfunc main() {\n    primes := sieve(50)\n    fmt.Println(primes)\n    // [2 3 5 7 11 13 17 19 23 29 31 37 41 43 47]\n    fmt.Println(\"50 以内共\", len(primes), \"个素数\")\n\n    // 素数计数函数 π(n)：估计 ≈ n / ln(n)\n    // π(50) ≈ 50/ln(50) ≈ 12.8，实际 15，误差合理\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "Miller-Rabin 概率素性测试" },
+    {
+      "type": "paragraph",
+      "text": "对大数（如 RSA 的 1024 位整数），试除法太慢。Miller-Rabin 是概率性测试——选 k 个随机基，如果都通过测试，那么 n 是素数的概率 ≥ 1 - 4^(-k)。实际使用 k=20 次就足够安全。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math/rand\"\n)\n\nfunc powMod(base, exp, mod int64) int64 {\n    result := int64(1)\n    base %= mod\n    for exp > 0 {\n        if exp&1 == 1 { result = result * base % mod }\n        exp >>= 1\n        base = base * base % mod\n    }\n    return result\n}\n\n// Miller-Rabin 单次测试\nfunc millerTest(d, n int64) bool {\n    a := 2 + rand.Int63n(n-4)\n    x := powMod(a, d, n)\n    if x == 1 || x == n-1 { return true }\n    for d != n-1 {\n        x = x * x % n\n        d *= 2\n        if x == 1 { return false }\n        if x == n-1 { return true }\n    }\n    return false\n}\n\nfunc isPrimeMR(n int64, k int) bool {\n    if n < 2 { return false }\n    if n < 4 { return true }\n    if n%2 == 0 { return false }\n    d := n - 1\n    for d%2 == 0 { d /= 2 }\n    for i := 0; i < k; i++ {\n        if !millerTest(d, n) { return false }\n    }\n    return true\n}\n\nfunc main() {\n    fmt.Println(isPrimeMR(1_000_000_007, 20))  // true（大素数）\n    fmt.Println(isPrimeMR(1_000_000_008, 20))  // false\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "RSA 加密的数论基础" },
+    {
+      "type": "paragraph",
+      "text": "RSA 的安全性依赖**大整数分解的困难性**：选两个大素数 p 和 q，公布 n = p×q，加密用 n 和公钥 e，解密需要知道 p 和 q——而从 n 分解出 p、q 在数学上没有已知的多项式时间算法。目前最快的分解算法是数域筛法（Number Field Sieve），复杂度是次指数级。"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "1 到 n 的素数批量用埃氏筛法",
+        "单个大数判素用 Miller-Rabin（k≥20）",
+        "质因数分解用试除法到 √n，余数大于 1 就也是质因子"
+      ],
+      "dont": [
+        "对大数用朴素试除法判素——1e9 以上就已经很慢了",
+        "认为「分解质因数」有快算法——这是 RSA 的安全假设"
+      ],
+      "pitfalls": [
+        "埃氏筛从 i² 开始标记时，i² 可能溢出 int——用 int64 或先检查"
+      ],
+      "criterion": "**判断标准**：能解释 RSA 的数论依据，并手写埃氏筛法 → 掌握本章。"
+    },
+    {
+      "type": "quote",
+      "text": "素数是数学中永恒的谜题，也是现代密码学的地基。",
+      "by": "数论导引"
+    }
+  ]
+}

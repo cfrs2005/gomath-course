@@ -1,0 +1,84 @@
+{
+  "meta": {
+    "slug": "calculus",
+    "chapter": "CHAPTER 11",
+    "title": "极限与导数：微积分入门",
+    "subtitle": "梯度下降的数学根基，从变化率到优化",
+    "updated": "2026-05-25",
+    "reading_time": "14 分钟",
+    "audience": ["ML 工程师", "数据科学家", "算法研究者"],
+    "problems_solved": [
+      "梯度下降为什么沿负梯度方向走",
+      "导数在代码里怎么数值近似",
+      "链式法则和反向传播是什么关系"
+    ],
+    "takeaways": [
+      "导数 f'(x) 是函数在 x 处的瞬时变化率",
+      "梯度是多元函数对每个变量的偏导数向量",
+      "链式法则：复合函数求导，内外相乘"
+    ],
+    "breadcrumbs": ["程序猿数学课", "分析数学", "极限与导数"],
+    "prev": { "slug": "vector", "title": "向量与空间变换" },
+    "next": { "slug": "integral", "title": "积分：累积的思想" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "导数衡量「变化有多快」。梯度下降依赖它找最小值，神经网络的反向传播依赖它传递误差信号。不理解导数，你只能把梯度下降当黑盒用——理解了，你能调参、能诊断、能改损失函数。"
+    },
+    {
+      "type": "principle",
+      "text": "导数 = 切线斜率 = 瞬时变化率 = 梯度的分量。这四个说法是同一件事。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "数值导数：差分近似" },
+    {
+      "type": "paragraph",
+      "text": "导数的定义是极限 `f'(x) = lim_{h→0} (f(x+h) - f(x)) / h`。数值上用有限差分近似，中心差分 `(f(x+h) - f(x-h)) / (2h)` 比前向差分精度高一阶（误差 O(h²) vs O(h)）。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n)\n\n// 数值导数（中心差分，精度 O(h²)）\nfunc derivative(f func(float64) float64, x, h float64) float64 {\n    return (f(x+h) - f(x-h)) / (2 * h)\n}\n\n// 数值梯度（多元函数偏导数向量）\nfunc gradient(f func([]float64) float64, x []float64, h float64) []float64 {\n    grad := make([]float64, len(x))\n    for i := range x {\n        xi := x[i]\n        x[i] = xi + h\n        fPlus := f(x)\n        x[i] = xi - h\n        fMinus := f(x)\n        x[i] = xi\n        grad[i] = (fPlus - fMinus) / (2 * h)\n    }\n    return grad\n}\n\nfunc main() {\n    // sin'(x) = cos(x)\n    x := math.Pi / 4\n    numDeriv := derivative(math.Sin, x, 1e-5)\n    analytic := math.Cos(x)\n    fmt.Printf(\"数值导数: %.8f\\n\", numDeriv)\n    fmt.Printf(\"解析导数: %.8f\\n\", analytic)\n    fmt.Printf(\"误差:     %.2e\\n\", math.Abs(numDeriv-analytic))\n\n    // f(x,y) = x² + y² 在 (1,1) 处的梯度 = [2,2]\n    f := func(v []float64) float64 { return v[0]*v[0] + v[1]*v[1] }\n    grad := gradient(f, []float64{1, 1}, 1e-5)\n    fmt.Printf(\"梯度: [%.4f, %.4f]\\n\", grad[0], grad[1])  // [2 2]\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "梯度下降：沿最陡下降方向走" },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n)\n\n// 梯度下降：最小化 f(x)\nfunc gradientDescent(\n    f func([]float64) float64,\n    init []float64,\n    lr float64,\n    steps int,\n) []float64 {\n    x := make([]float64, len(init))\n    copy(x, init)\n    h := 1e-5\n\n    for step := 0; step < steps; step++ {\n        // 数值梯度\n        grad := make([]float64, len(x))\n        for i := range x {\n            xi := x[i]\n            x[i] = xi + h; fp := f(x)\n            x[i] = xi - h; fm := f(x)\n            x[i] = xi\n            grad[i] = (fp - fm) / (2 * h)\n        }\n        // 参数更新：沿负梯度方向\n        for i := range x {\n            x[i] -= lr * grad[i]\n        }\n        if step%100 == 0 {\n            fmt.Printf(\"step %4d: f=%.6f x=[%.4f,%.4f]\\n\", step, f(x), x[0], x[1])\n        }\n    }\n    return x\n}\n\nfunc main() {\n    // 最小化 f(x,y) = (x-3)² + (y+1)²，最小值在 (3,-1)\n    f := func(v []float64) float64 {\n        dx, dy := v[0]-3, v[1]+1\n        return dx*dx + dy*dy\n    }\n    result := gradientDescent(f, []float64{0, 0}, 0.1, 500)\n    fmt.Printf(\"最小值点: [%.4f, %.4f]\\n\", result[0], result[1])\n    _ = math.Abs\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "链式法则与反向传播" },
+    {
+      "type": "paragraph",
+      "text": "神经网络是复合函数 `L(f₃(f₂(f₁(x))))`。求 L 对第一层参数的导数，用链式法则：`∂L/∂w₁ = ∂L/∂f₃ × ∂f₃/∂f₂ × ∂f₂/∂f₁ × ∂f₁/∂w₁`。==反向传播就是自动化地计算这些链式乘积==，从输出层往输入层反向传递梯度。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n)\n\n// 简单计算图：z = sigmoid(wx + b)\n// 前向传播 + 反向传播\n\nfunc sigmoid(x float64) float64 {\n    return 1 / (1 + math.Exp(-x))\n}\n\nfunc sigmoidGrad(x float64) float64 {\n    s := sigmoid(x)\n    return s * (1 - s)  // sigmoid 的导数\n}\n\nfunc main() {\n    w, x, b := 2.0, 1.5, -1.0\n\n    // 前向传播\n    z := w*x + b         // z = 2\n    a := sigmoid(z)      // a = sigmoid(2) ≈ 0.88\n    loss := (a - 1) * (a - 1)  // L = (a-1)²\n\n    // 反向传播（链式法则）\n    dL_da := 2 * (a - 1)         // ∂L/∂a\n    da_dz := sigmoidGrad(z)      // ∂a/∂z\n    dz_dw := x                   // ∂z/∂w\n\n    dL_dw := dL_da * da_dz * dz_dw  // 链式法则\n    fmt.Printf(\"前向: z=%.4f a=%.4f loss=%.4f\\n\", z, a, loss)\n    fmt.Printf(\"反向: ∂L/∂w = %.6f\\n\", dL_dw)\n}"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "调参之前先验证数值梯度 ≈ 解析梯度（梯度检验）",
+        "学习率是最重要的超参数：太大发散，太小不收敛",
+        "损失函数不下降时先检查梯度是否消失（接近 0）"
+      ],
+      "dont": [
+        "在有解析梯度的情况下用数值梯度——计算开销大 O(n) 倍",
+        "梯度下降迭代次数固定——改用 early stopping 或 loss 阈值"
+      ],
+      "pitfalls": [
+        "学习率对 loss 曲线的影响是非线性的——网格搜索而非线性调整"
+      ],
+      "criterion": "**判断标准**：能手写链式法则推导 ∂L/∂w，并解释负梯度方向 → 掌握本章。"
+    },
+    {
+      "type": "quote",
+      "text": "微积分是人类第一次学会描述「正在发生」的数学，而不只是「已经发生」的结果。",
+      "by": "Steven Strogatz《微积分的力量》"
+    }
+  ]
+}

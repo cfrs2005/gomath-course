@@ -1,0 +1,105 @@
+{
+  "meta": {
+    "slug": "binary",
+    "chapter": "CHAPTER 02",
+    "title": "进制与位运算：二进制魔法",
+    "subtitle": "一切皆 0 和 1，位运算是最快的数学",
+    "updated": "2026-05-25",
+    "reading_time": "10 分钟",
+    "audience": ["后端工程师", "系统编程方向的开发者"],
+    "problems_solved": [
+      "位运算为什么比普通算术快",
+      "怎么用位掩码替代多个 bool 字段",
+      "如何手写进制转换不依赖标准库"
+    ],
+    "takeaways": [
+      "位运算是 CPU 的原生操作，比乘除法快数倍",
+      "位掩码是权限系统、状态机的标准实现模式",
+      "进制转换本质是多项式的不同基底展开"
+    ],
+    "breadcrumbs": ["程序猿数学课", "数论基础", "进制与位运算"],
+    "prev": { "slug": "integers", "title": "整数与浮点：数的真相" },
+    "next": { "slug": "modular", "title": "模运算与同余：时钟数学" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "二进制不只是计算机内部的实现细节——它是程序员能直接操作的最底层数学。掌握位运算，你就拥有了 O(1) 的集合操作、比乘除快 10 倍的技巧，以及理解 CPU 如何工作的钥匙。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "进制转换：多项式换底"
+    },
+    {
+      "type": "paragraph",
+      "text": "任何进制表示都是同一个数的不同**基底多项式**展开。十进制 `42 = 4×10¹ + 2×10⁰`，二进制 `101010 = 1×2⁵ + 0×2⁴ + 1×2³ + 0×2² + 1×2¹ + 0×2⁰`。==转换本质是换基底==，算法是短除法（十→二）和累加（二→十）。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\n// 十进制转任意进制（不用标准库）\nfunc toBase(n, base int) string {\n    if n == 0 {\n        return \"0\"\n    }\n    digits := \"0123456789ABCDEF\"\n    result := []\nbyte{}\n    for n > 0 {\n        result = append([]byte{digits[n%base]}, result...)\n        n /= base\n    }\n    return string(result)\n}\n\n// 任意进制转十进制\nfunc fromBase(s string, base int) int {\n    result := 0\n    for _, ch := range s {\n        d := int(ch - '0')\n        if ch >= 'A' {\n            d = int(ch-'A') + 10\n        }\n        result = result*base + d\n    }\n    return result\n}\n\nfunc main() {\n    fmt.Println(toBase(42, 2))   // 101010\n    fmt.Println(toBase(255, 16)) // FF\n    fmt.Println(fromBase(\"101010\", 2))  // 42\n    fmt.Printf(\"%b %o %x\\n\", 42, 42, 42) // Go 内置：101010 52 2a\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "位运算六式"
+    },
+    {
+      "type": "decision_table",
+      "headers": ["运算", "符号", "数学含义", "经典用途"],
+      "rows": [
+        ["AND", "&",  "按位乘，两个都是 1 才为 1", "取低位，检查标志位"],
+        ["OR",  "|",  "按位加，有一个是 1 就为 1", "设置标志位"],
+        ["XOR", "^",  "相同为 0，不同为 1",         "翻转位，不用临时变量交换"],
+        ["NOT", "^x", "按位取反",                   "位掩码取反"],
+        ["SHL", "<<", "乘以 2 的幂",                "快速乘以 2^n"],
+        ["SHR", ">>", "除以 2 的幂（取整）",         "快速除以 2^n"]
+      ],
+      "mnemonic": "**AND 取交集，OR 并集，XOR 差集，移位代替乘除。**"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\nfunc main() {\n    // 快速乘除\n    x := 100\n    fmt.Println(x << 3)  // x * 8 = 800\n    fmt.Println(x >> 2)  // x / 4 = 25\n\n    // 判断奇偶（比 % 快）\n    for _, n := range []int{3, 4, 7, 8} {\n        fmt.Printf(\"%d 是%s\\n\", n, map[bool]string{true: \"奇数\", false: \"偶数\"}[n&1 == 1])\n    }\n\n    // 不用临时变量交换\n    a, b := 0xAA, 0xBB\n    a ^= b; b ^= a; a ^= b\n    fmt.Printf(\"a=%X b=%X\\n\", a, b)  // a=BB b=AA\n\n    // 取最低位的 1\n    n := 0b10110100\n    lowestBit := n & (-n)  // 0b00000100\n    fmt.Printf(\"%08b\\n\", lowestBit)\n\n    // 消去最低位的 1（Brian Kernighan trick）\n    fmt.Printf(\"%08b\\n\", n & (n-1))  // 0b10110000\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "位掩码：用整数表达集合"
+    },
+    {
+      "type": "paragraph",
+      "text": "一个 `uint64` 可以表示 64 个布尔值的集合，集合操作全部是位运算，时间复杂度 O(1)。这是权限系统、特性开关、状态机的标准实现方式。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\n// 权限系统：用位掩码\nconst (\n    PermRead    = 1 << iota  // 0001\n    PermWrite                // 0010\n    PermExecute              // 0100\n    PermAdmin                // 1000\n)\n\nfunc hasPermission(userPerm, required uint) bool {\n    return userPerm&required == required\n}\n\nfunc main() {\n    // 普通用户：读+写\n    user := uint(PermRead | PermWrite)\n    fmt.Printf(\"用户权限: %04b\\n\", user)\n\n    // 检查权限\n    fmt.Println(hasPermission(user, PermRead))    // true\n    fmt.Println(hasPermission(user, PermAdmin))   // false\n\n    // 添加权限\n    user |= PermExecute\n    fmt.Printf(\"添加执行后: %04b\\n\", user)  // 0111\n\n    // 移除权限\n    user &^= PermWrite  // 位清除（AND NOT）\n    fmt.Printf(\"移除写后: %04b\\n\", user)    // 0101\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "Brian Kernighan 数 1 的个数"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math/bits\"\n)\n\n// 手写：O(k) k 是 1 的个数\nfunc countOnes(n int) int {\n    count := 0\n    for n != 0 {\n        n &= n - 1  // 消去最低位的 1\n        count++\n    }\n    return count\n}\n\nfunc main() {\n    fmt.Println(countOnes(0b10110100))  // 4\n    fmt.Println(bits.OnesCount(0b10110100)) // 4（标准库，编译为单条 POPCNT 指令）\n\n    // 判断 2 的幂次\n    isPowerOf2 := func(n int) bool { return n > 0 && n&(n-1) == 0 }\n    fmt.Println(isPowerOf2(16))  // true\n    fmt.Println(isPowerOf2(18))  // false\n}"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "权限和状态标志用位掩码而非多个 bool 字段",
+        "乘除 2 的幂次用移位运算",
+        "`bits.OnesCount`、`bits.Len` 等用标准库（编译为 CPU 指令）"
+      ],
+      "dont": [
+        "在热路径之外为了\"优化\"而强行用位运算——可读性优先",
+        "用 XOR 交换变量——现代编译器能优化 tmp 写法，且更易读",
+        "忘记 Go 的 `^x` 是取反（而不是 `~x`）"
+      ],
+      "pitfalls": [
+        "位移量超过类型宽度是未定义行为（Go 中结果为 0，但别依赖这个）"
+      ],
+      "criterion": "**判断标准**：能手写 `countOnes` 并解释 `n&(n-1)` 的含义 → 掌握本章。"
+    },
+    {
+      "type": "quote",
+      "text": "位运算是计算机最原始的语言，掌握它，你就能和 CPU 直接对话。",
+      "by": "The Art of Computer Programming"
+    }
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "meta": {
+    "slug": "hash",
+    "chapter": "CHAPTER 17",
+    "title": "哈希与密码学：安全的数学",
+    "subtitle": "MD5 为什么不安全，SHA-256 背后藏着什么数论",
+    "updated": "2026-05-25",
+    "reading_time": "14 分钟",
+    "audience": ["后端工程师", "安全工程师"],
+    "problems_solved": [
+      "哈希函数的数学性质是什么",
+      "为什么密码不能存明文，也不能只用 MD5",
+      "HMAC 和 JWT 签名的数学原理"
+    ],
+    "takeaways": [
+      "好的哈希函数：确定性、雪崩效应、抗碰撞、单向性",
+      "bcrypt/argon2 是密码哈希的标准——慢是安全特性",
+      "MAC = 消息 + 密钥的哈希，防止篡改和伪造"
+    ],
+    "breadcrumbs": ["程序猿数学课", "算法数学", "哈希与密码学"],
+    "prev": { "slug": "complexity", "title": "算法复杂度：渐进分析" },
+    "next": { "slug": "information", "title": "信息论与熵" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "哈希函数是现代密码学的基石：数字签名、密码存储、数据完整性验证，全都依赖它。理解哈希的数学性质，你就能判断什么时候用 MD5、什么时候必须用 SHA-256、什么时候需要 bcrypt。"
+    },
+    {
+      "type": "principle",
+      "text": "加密哈希函数的核心性质：雪崩效应（输入 1 bit 变化 → 输出 50% bit 变化）+ 抗原像 + 抗碰撞。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "哈希函数的数学性质" },
+    {
+      "type": "decision_table",
+      "headers": ["性质", "定义", "被破解的后果"],
+      "rows": [
+        ["确定性",   "相同输入永远产生相同输出", "无（基础要求）"],
+        ["单向性",   "从 H(x) 无法反推 x",        "密码泄露"],
+        ["抗弱碰撞", "给定 x，找不到 y≠x 使 H(y)=H(x)", "数字签名伪造"],
+        ["抗强碰撞", "找不到任意 x≠y 使 H(x)=H(y)", "证书伪造"],
+        ["雪崩效应", "输入微小变化导致输出剧烈变化", "密文模式泄露"]
+      ],
+      "mnemonic": "**MD5 的强碰撞已被破解，SHA-1 的弱碰撞已被破解，生产环境最低用 SHA-256。**"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"crypto/hmac\"\n    \"crypto/sha256\"\n    \"fmt\"\n)\n\nfunc main() {\n    // SHA-256：雪崩效应演示\n    h1 := sha256.Sum256([]byte(\"hello\"))\n    h2 := sha256.Sum256([]byte(\"hellp\"))  // 只改了最后一个字母\n\n    // 计算两个哈希有多少 bit 不同\n    diff := 0\n    for i := 0; i < 32; i++ {\n        xor := h1[i] ^ h2[i]\n        for xor != 0 {\n            diff += int(xor & 1)\n            xor >>= 1\n        }\n    }\n    fmt.Printf(\"256 bits 中有 %d bits 不同（%.1f%%）\\n\", diff, float64(diff)/256*100)\n    // 应该接近 50%\n\n    // HMAC-SHA256：消息认证码\n    key := []byte(\"secret-key\")\n    mac := hmac.New(sha256.New, key)\n    mac.Write([]byte(\"payload data\"))\n    sig := mac.Sum(nil)\n    fmt.Printf(\"HMAC: %x\\n\", sig)\n\n    // 验证：使用 hmac.Equal 防止时序攻击\n    mac2 := hmac.New(sha256.New, key)\n    mac2.Write([]byte(\"payload data\"))\n    fmt.Println(\"验证通过:\", hmac.Equal(sig, mac2.Sum(nil)))\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "密码存储：为什么需要慢哈希" },
+    {
+      "type": "paragraph",
+      "text": "存储密码不能用 SHA-256——现代 GPU 每秒能跑 10 亿次 SHA-256，暴力破解 8 位密码只需几分钟。**bcrypt 和 argon2** 通过可调节的计算代价，让每次哈希需要 100ms+，GPU 暴力破解变得不切实际。==慢是安全特性，不是 bug。=="
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"time\"\n    \"crypto/sha256\"\n    \"golang.org/x/crypto/bcrypt\"\n)\n\nfunc main() {\n    password := []byte(\"mypassword123\")\n\n    // SHA-256：极快（不适合密码）\n    t1 := time.Now()\n    for i := 0; i < 1_000_000; i++ {\n        sha256.Sum256(password)\n    }\n    fmt.Printf(\"SHA-256 x 100万次: %v（约 %.0f ns/次）\\n\",\n        time.Since(t1), float64(time.Since(t1).Nanoseconds())/1_000_000)\n\n    // bcrypt：故意慢（cost=12 约 200ms）\n    t2 := time.Now()\n    hash, _ := bcrypt.GenerateFromPassword(password, 12)\n    fmt.Printf(\"bcrypt cost=12: %v\\n\", time.Since(t2))\n\n    // 验证密码\n    err := bcrypt.CompareHashAndPassword(hash, password)\n    fmt.Println(\"密码正确:\", err == nil)\n    err = bcrypt.CompareHashAndPassword(hash, []byte(\"wrong\"))\n    fmt.Println(\"错误密码:\", err != nil)\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "哈希表的数学：装载因子与冲突" },
+    {
+      "type": "paragraph",
+      "text": "哈希表的负载因子 `α = n/m`（n 个键，m 个槽）决定了冲突概率。==链式哈希的平均查找时间是 Θ(1 + α)==，所以要控制 α < 0.75（Go 的 map 默认阈值）。哈希函数的关键要求是均匀分布——把键均匀散布到 m 个槽里。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\n// 多项式哈希（Polynomial Rolling Hash）\n// 用于字符串哈希、Rabin-Karp 算法\nfunc rollingHash(s string, base, mod int) int {\n    h := 0\n    for _, c := range s {\n        h = (h*base + int(c)) % mod\n    }\n    return h\n}\n\n// Rabin-Karp 字符串搜索：O(n+m) 平均\nfunc rabinKarp(text, pattern string) []int {\n    n, m := len(text), len(pattern)\n    if m > n { return nil }\n    base, mod := 31, 1_000_000_007\n\n    // 计算 base^(m-1) % mod\n    pow := 1\n    for i := 0; i < m-1; i++ { pow = pow * base % mod }\n\n    pHash := rollingHash(pattern, base, mod)\n    tHash := rollingHash(text[:m], base, mod)\n\n    result := []int{}\n    for i := 0; i <= n-m; i++ {\n        if tHash == pHash && text[i:i+m] == pattern {\n            result = append(result, i)\n        }\n        if i < n-m {\n            tHash = (tHash - int(text[i])*pow%mod + mod) % mod\n            tHash = (tHash*base + int(text[i+m])) % mod\n        }\n    }\n    return result\n}\n\nfunc main() {\n    positions := rabinKarp(\"hello world hello go\", \"hello\")\n    fmt.Println(\"找到 'hello' 在位置:\", positions)  // [0 12]\n}"
+    },
+    {
+      "type": "callout",
+      "tone": "danger",
+      "title": "常见密码存储错误",
+      "text": "明文存储、MD5 存储、SHA-256 存储（无盐）——这三种方式全部不安全。正确做法：bcrypt / argon2id，cost 参数根据服务器性能调整，保证哈希耗时 > 100ms。"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "密码哈希用 bcrypt（cost≥12）或 argon2id",
+        "消息认证用 HMAC-SHA256，不要自己拼接 key+message",
+        "比较哈希值用常量时间比较（`hmac.Equal`）防时序攻击"
+      ],
+      "dont": [
+        "用 MD5 或 SHA-1 做密码哈希——已被破解",
+        "哈希时不加 salt——相同密码产生相同哈希，彩虹表可攻击",
+        "自己实现加密算法——用标准库"
+      ],
+      "pitfalls": [
+        "bcrypt 最长处理 72 字节，更长的密码会被截断——先 SHA-256 再 bcrypt"
+      ],
+      "criterion": "**判断标准**：能解释为什么 bcrypt 的「慢」是安全特性，而非性能缺陷 → 掌握本章。"
+    },
+    {
+      "type": "quote",
+      "text": "密码学是数论和计算机科学的婚礼礼物——一边用数学证明安全，一边用工程实现保护。",
+      "by": "Bruce Schneier《应用密码学》"
+    }
+  ]
+}

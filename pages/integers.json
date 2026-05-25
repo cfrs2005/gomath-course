@@ -1,0 +1,112 @@
+{
+  "meta": {
+    "slug": "integers",
+    "chapter": "CHAPTER 01",
+    "title": "整数与浮点：数的真相",
+    "subtitle": "计算机里的数不是你以为的数",
+    "updated": "2026-05-25",
+    "reading_time": "12 分钟",
+    "audience": ["后端工程师", "想理解精度 bug 的开发者"],
+    "problems_solved": [
+      "为什么 0.1 + 0.2 ≠ 0.3",
+      "int32 溢出为什么会变成负数",
+      "金融系统为什么用定点数而不是 float"
+    ],
+    "takeaways": [
+      "整数在计算机里用二进制补码表示，溢出是截断",
+      "浮点数是科学计数法的二进制版，精度有上限",
+      "精度敏感场景用整数定点数或 math/big"
+    ],
+    "breadcrumbs": ["程序猿数学课", "数论基础", "整数与浮点"],
+    "prev": { "slug": "index", "title": "为什么程序猿要学数学" },
+    "next": { "slug": "binary", "title": "进制与位运算：二进制魔法" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "整数和浮点数是程序员每天打交道的数，但很少有人真正理解它们在内存里是什么。理解这个，你就能预测溢出、精度损失和类型转换的所有行为——而不是靠 `fmt.Println` 试。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "整数：补码的世界"
+    },
+    {
+      "type": "paragraph",
+      "text": "Go 的 `int32` 能表示 `−2,147,483,648` 到 `2,147,483,647`。为什么负数比正数多一个？因为 ==补码== 的设计——用最高位作符号位，0 表示正数，1 表示负数，但 `10000...0` 这个特殊值被分给了最小负数，所以负数的绝对值范围比正数大 1。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n)\n\nfunc main() {\n    // 整数溢出：不报错，只截断\n    var x int32 = math.MaxInt32  // 2147483647\n    x++\n    fmt.Println(x)  // -2147483648  ← 溢出回绕\n\n    // 补码：负数的二进制表示\n    var n int8 = -1\n    fmt.Printf(\"%08b\\n\", uint8(n))  // 11111111\n\n    // 补码规律：正数按位取反+1 = 其负数\n    // -1 的补码: 00000001 → 取反 11111110 → +1 = 11111111 ✓\n}"
+    },
+    {
+      "type": "callout",
+      "tone": "warn",
+      "title": "溢出是静默 bug",
+      "text": "Go 的整数溢出不 panic，不报错，直接回绕。在循环计数、时间戳计算、累加器场景都要显式检查边界，或换用 `int64` / `math/big`。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "浮点数：IEEE 754"
+    },
+    {
+      "type": "paragraph",
+      "text": "浮点数本质是**二进制科学计数法**：`(-1)^s × 1.fraction × 2^(exponent-127)`。`float32` 用 1 位符号 + 8 位指数 + 23 位尾数，能表示的实数是稀疏分布的——越靠近 0 越密集，越大越稀疏。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n    \"math/bits\"\n    _ \"unsafe\"\n)\n\nfunc float64Bits(f float64) uint64 {\n    return math.Float64bits(f)\n}\n\nfunc main() {\n    // 0.1 在二进制里是无限循环小数\n    fmt.Printf(\"0.1 bits: %064b\\n\", float64Bits(0.1))\n    fmt.Println(0.1 + 0.2)          // 0.30000000000000004\n    fmt.Println(0.1 + 0.2 == 0.3)   // false\n\n    // 正确比较浮点数：用误差范围\n    const eps = 1e-9\n    a, b := 0.1+0.2, 0.3\n    fmt.Println(math.Abs(a-b) < eps) // true\n\n    // 特殊值\n    inf := math.Inf(1)\n    nan := math.NaN()\n    fmt.Println(inf, nan, math.IsNaN(nan))\n\n    _ = bits.OnesCount64(0) // 引入 bits 包\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "精度陷阱：为什么不用 float 存钱"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math/big\"\n)\n\nfunc main() {\n    // 错误做法：浮点累加\n    total := 0.0\n    for i := 0; i < 1000; i++ {\n        total += 0.1\n    }\n    fmt.Println(total)  // 99.9999999999986  ← 差了 0.0000000000014\n\n    // 正确做法 1：用整数（分/厘作单位）\n    totalCents := 0\n    for i := 0; i < 1000; i++ {\n        totalCents += 10  // 0.1 元 = 10 分\n    }\n    fmt.Println(float64(totalCents) / 100)  // 100\n\n    // 正确做法 2：math/big.Rat 精确有理数\n    rat := new(big.Rat)\n    tenth := new(big.Rat).SetFrac(big.NewInt(1), big.NewInt(10))\n    for i := 0; i < 1000; i++ {\n        rat.Add(rat, tenth)\n    }\n    fmt.Println(rat.FloatString(2))  // 100.00\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "数的范围速查"
+    },
+    {
+      "type": "decision_table",
+      "headers": ["类型", "位数", "最小值", "最大值", "精度"],
+      "rows": [
+        ["int8",    "8",  "-128",                  "127",                    "整数，精确"],
+        ["int32",   "32", "-2,147,483,648",         "2,147,483,647",          "整数，精确"],
+        ["int64",   "64", "-9.2×10¹⁸",             "9.2×10¹⁸",               "整数，精确"],
+        ["float32", "32", "1.2×10⁻³⁸",             "3.4×10³⁸",               "约 7 位有效数字"],
+        ["float64", "64", "2.2×10⁻³⁰⁸",            "1.8×10³⁰⁸",              "约 15 位有效数字"]
+      ],
+      "mnemonic": "**金融用整数，科学用 float64，天文/加密用 math/big。**"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "金融金额用整数（分为单位）或 `shopspring/decimal`",
+        "浮点比较用 `math.Abs(a-b) < epsilon`",
+        "循环累加时考虑 Kahan 求和算法减少误差"
+      ],
+      "dont": [
+        "用 `float64` 存储货币金额",
+        "用 `==` 比较两个浮点数",
+        "忽略 int 溢出——尤其是 32 位平台上的 int"
+      ],
+      "pitfalls": [
+        "int 在 64 位系统是 64 位，在 32 位系统是 32 位——跨平台代码要用 int64"
+      ],
+      "criterion": "**判断标准**：能解释 0.1+0.2≠0.3 是因为尾数截断 → 掌握本章。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "数学本质：数系的层次"
+    },
+    {
+      "type": "paragraph",
+      "text": "数学上，自然数 ⊂ 整数 ⊂ 有理数 ⊂ 实数 ⊂ 复数。计算机实现了这个层次的**有限离散近似**：`uint` 近似自然数，`int` 近似整数，`float64` 近似实数（但只是稀疏采样）。==理解这个层次关系==，你就能预测任何类型转换的行为。"
+    },
+    {
+      "type": "quote",
+      "text": "计算机里没有实数，只有有限精度的近似。工程师的职责是控制这个近似的误差。",
+      "by": "数值分析教材"
+    }
+  ]
+}

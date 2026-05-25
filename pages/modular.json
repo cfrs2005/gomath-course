@@ -1,0 +1,83 @@
+{
+  "meta": {
+    "slug": "modular",
+    "chapter": "CHAPTER 03",
+    "title": "模运算与同余：时钟数学",
+    "subtitle": "哈希表、加密、循环缓冲区，全靠这一套",
+    "updated": "2026-05-25",
+    "reading_time": "10 分钟",
+    "audience": ["后端工程师", "对密码学感兴趣的开发者"],
+    "problems_solved": [
+      "哈希函数为什么总是 % 一个大素数",
+      "循环队列的下标怎么优雅地处理边界",
+      "快速幂是怎么用模运算加速的"
+    ],
+    "takeaways": [
+      "模运算定义了一个有限的循环数字世界",
+      "a ≡ b (mod m) 意味着 a 和 b 在 mod m 意义下等价",
+      "快速幂模 = 分治 + 模运算，是密码学的基石"
+    ],
+    "breadcrumbs": ["程序猿数学课", "数论基础", "模运算与同余"],
+    "prev": { "slug": "binary", "title": "进制与位运算：二进制魔法" },
+    "next": { "slug": "primes", "title": "素数与因式分解：数的基石" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "模运算就是带余除法：`a mod m` 是 a 除以 m 的余数。它构造了一个**有限的循环世界**——就像时钟上的数字永远在 0–11 之间循环。这个世界里有加法、乘法，还有专属的「模逆元」，是密码学和哈希的数学基础。"
+    },
+    {
+      "type": "principle",
+      "text": "模运算把无限的整数折叠成有限的环，所有运算都在这个环里封闭完成。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "基本性质：运算可以分配进去" },
+    {
+      "type": "paragraph",
+      "text": "模运算的核心性质：`(a + b) % m = ((a % m) + (b % m)) % m`，乘法同理。这意味着你可以==在中间步骤就取模==，防止大数溢出。这是快速幂、哈希函数的根本原因。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\n// 快速幂：base^exp % mod，O(log exp)\nfunc powMod(base, exp, mod int64) int64 {\n    if mod == 1 {\n        return 0\n    }\n    result := int64(1)\n    base %= mod\n    for exp > 0 {\n        if exp&1 == 1 {           // exp 是奇数\n            result = result * base % mod\n        }\n        exp >>= 1\n        base = base * base % mod  // 平方\n    }\n    return result\n}\n\nfunc main() {\n    // 2^100 % 1000000007\n    fmt.Println(powMod(2, 100, 1_000_000_007))  // 976371285\n\n    // 循环队列：用模运算处理下标\n    buf := make([]int, 8)\n    head, tail := 0, 0\n    enqueue := func(v int) { buf[tail%8] = v; tail++ }\n    dequeue := func() int { v := buf[head%8]; head++; return v }\n    enqueue(1); enqueue(2); enqueue(3)\n    fmt.Println(dequeue(), dequeue())  // 1 2\n\n    // 哈希：字符串哈希用大素数取模防冲突\n    hash := func(s string, mod int) int {\n        h := 0\n        for _, c := range s {\n            h = (h*31 + int(c)) % mod\n        }\n        return h\n    }\n    fmt.Println(hash(\"hello\", 1_000_003))  // 稳定哈希值\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "同余方程与中国剩余定理" },
+    {
+      "type": "paragraph",
+      "text": "同余 `a ≡ b (mod m)` 表示 a 和 b 除以 m 的余数相同。**中国剩余定理（CRT）**告诉我们：如果 m₁, m₂, ... 两两互素，那么联立同余方程组有唯一解。这在密码学（RSA 加速）和日历计算中大量使用。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\n// 扩展欧几里得：求 ax + by = gcd(a,b) 的 x,y\nfunc extGCD(a, b int) (g, x, y int) {\n    if b == 0 {\n        return a, 1, 0\n    }\n    g, x1, y1 := extGCD(b, a%b)\n    return g, y1, x1 - (a/b)*y1\n}\n\n// 模逆元：a 在 mod m 下的逆元（需要 gcd(a,m)=1）\nfunc modInverse(a, m int) int {\n    _, x, _ := extGCD(a, m)\n    return (x%m + m) % m\n}\n\nfunc main() {\n    // 3 在 mod 7 下的逆元（3 * x ≡ 1 mod 7）\n    inv := modInverse(3, 7)\n    fmt.Println(inv, 3*inv%7)  // 5  1 ✓\n\n    // 中国剩余定理：x ≡ 2 mod 3，x ≡ 3 mod 5，x ≡ 2 mod 7 → x = 23\n    remainders := []int{2, 3, 2}\n    moduli := []int{3, 5, 7}\n    M := 3 * 5 * 7  // = 105\n    x := 0\n    for i, r := range remainders {\n        Mi := M / moduli[i]\n        x += r * Mi * modInverse(Mi, moduli[i])\n    }\n    fmt.Println(x % M)  // 23\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "实战：分布式系统的一致性哈希" },
+    {
+      "type": "paragraph",
+      "text": "一致性哈希把节点和键都映射到 `[0, 2³²)` 的环上（本质是 `mod 2³²`），键归属于顺时针方向最近的节点。==增删节点只影响环上相邻的数据==，而不是重新哈希全部数据。这是 Memcached、Cassandra 的核心设计。"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "中间计算过程就取模，防止 int64 溢出",
+        "哈希取模用大素数（如 1e9+7），减少冲突",
+        "需要模逆元时用扩展欧几里得算法"
+      ],
+      "dont": [
+        "用 `%` 做负数取模时忘记加 m：`(-3) % 5 = -3` 而非 2",
+        "循环下标取模时用 `%` 以外的方式（if 分支容易出 bug）"
+      ],
+      "pitfalls": [
+        "Go 的 `%` 对负数返回负余数：`-7 % 3 = -1`，正确做法是 `((n%m)+m)%m`"
+      ],
+      "criterion": "**判断标准**：能手写快速幂并解释为什么中间取模不影响结果 → 掌握本章。"
+    },
+    {
+      "type": "quote",
+      "text": "模运算是数学的橡皮筋——把无限的数轴弹性地卷成有限的圆环。",
+      "by": "本课笔记"
+    }
+  ]
+}

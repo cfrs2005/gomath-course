@@ -1,0 +1,75 @@
+{
+  "meta": {
+    "slug": "integral",
+    "chapter": "CHAPTER 12",
+    "title": "积分：累积的思想",
+    "subtitle": "面积、概率分布、数值积分——连续求和的本质",
+    "updated": "2026-05-25",
+    "reading_time": "10 分钟",
+    "audience": ["ML 工程师", "数据科学家"],
+    "problems_solved": [
+      "概率密度函数和累积分布函数有什么关系",
+      "数值积分的几种方法怎么选",
+      "为什么神经网络的 softmax 需要归一化"
+    ],
+    "takeaways": [
+      "积分是无限多个无限小矩形面积的极限求和",
+      "微积分基本定理：积分和导数互为逆运算",
+      "数值积分用梯形法或辛普森法近似"
+    ],
+    "breadcrumbs": ["程序猿数学课", "分析数学", "积分"],
+    "prev": { "slug": "calculus", "title": "极限与导数：微积分入门" },
+    "next": { "slug": "fourier", "title": "傅里叶变换：频域的世界" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "积分是求和的极限——无限多个无限小的量相加。它计算曲线下的面积、概率分布的累积量、物理量的累积效果。数值积分让计算机能近似计算没有解析式的积分。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "黎曼积分：分块求和逼近" },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n)\n\n// 黎曼和（左端点）\nfunc riemannLeft(f func(float64) float64, a, b float64, n int) float64 {\n    h := (b - a) / float64(n)\n    sum := 0.0\n    for i := 0; i < n; i++ {\n        sum += f(a + float64(i)*h)\n    }\n    return sum * h\n}\n\n// 梯形法则（精度更高：O(h²)）\nfunc trapezoid(f func(float64) float64, a, b float64, n int) float64 {\n    h := (b - a) / float64(n)\n    sum := (f(a) + f(b)) / 2\n    for i := 1; i < n; i++ {\n        sum += f(a + float64(i)*h)\n    }\n    return sum * h\n}\n\n// 辛普森法则（精度：O(h⁴)）\nfunc simpson(f func(float64) float64, a, b float64, n int) float64 {\n    if n%2 != 0 { n++ }  // n 必须是偶数\n    h := (b - a) / float64(n)\n    sum := f(a) + f(b)\n    for i := 1; i < n; i++ {\n        if i%2 == 0 {\n            sum += 2 * f(a+float64(i)*h)\n        } else {\n            sum += 4 * f(a+float64(i)*h)\n        }\n    }\n    return sum * h / 3\n}\n\nfunc main() {\n    // 计算 ∫₀¹ x² dx = 1/3 ≈ 0.333333\n    f := func(x float64) float64 { return x * x }\n    fmt.Printf(\"黎曼左端: %.6f\\n\", riemannLeft(f, 0, 1, 1000))\n    fmt.Printf(\"梯形法则: %.6f\\n\", trapezoid(f, 0, 1, 1000))\n    fmt.Printf(\"辛普森法: %.6f\\n\", simpson(f, 0, 1, 100))\n    fmt.Printf(\"精确值:   %.6f\\n\", 1.0/3)\n\n    // ∫₀^π sin(x) dx = 2（经典）\n    fmt.Printf(\"∫sin = %.6f（应为 2.0）\\n\", simpson(math.Sin, 0, math.Pi, 100))\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "概率分布：PDF 与 CDF" },
+    {
+      "type": "paragraph",
+      "text": "概率密度函数（PDF）的积分是累积分布函数（CDF）：`CDF(x) = ∫_{-∞}^{x} PDF(t) dt`。正态分布没有解析的 CDF，只能数值积分。这就是为什么误差函数 `erf` 是很多数学库的核心函数。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport (\n    \"fmt\"\n    \"math\"\n)\n\n// 标准正态分布的 PDF\nfunc normalPDF(x float64) float64 {\n    return math.Exp(-x*x/2) / math.Sqrt(2*math.Pi)\n}\n\n// 数值近似 CDF（标准正态）\nfunc normalCDF(x float64) float64 {\n    return (1 + math.Erf(x/math.Sqrt2)) / 2\n}\n\nfunc main() {\n    // P(-1 < X < 1) ≈ 68.27%（经验法则）\n    p := normalCDF(1) - normalCDF(-1)\n    fmt.Printf(\"P(-1σ < X < 1σ) = %.4f%%\\n\", p*100)  // 68.27%\n\n    // P(-2 < X < 2) ≈ 95.45%\n    p2 := normalCDF(2) - normalCDF(-2)\n    fmt.Printf(\"P(-2σ < X < 2σ) = %.4f%%\\n\", p2*100)  // 95.45%\n\n    // 数值积分验证 PDF 总面积 = 1\n    total := 0.0\n    h := 0.001\n    for x := -10.0; x < 10.0; x += h {\n        total += normalPDF(x) * h\n    }\n    fmt.Printf(\"PDF 总面积 = %.6f（应为 1.0）\\n\", total)\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "蒙特卡洛积分：高维场景" },
+    {
+      "type": "paragraph",
+      "text": "梯形法、辛普森法在高维时遭遇**维数灾难**：d 维积分需要 n^d 个采样点。蒙特卡洛积分用随机采样，误差是 O(1/√n)，**与维数无关**。这是机器学习、物理模拟、期权定价里高维积分的标准方法。"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "低维精确积分用辛普森法（4 阶精度）",
+        "高维或复杂区域用蒙特卡洛积分",
+        "用微积分基本定理验证数值结果：F(b)-F(a)"
+      ],
+      "dont": [
+        "用黎曼左端点法——梯形法精度更高，代码复杂度相同",
+        "对奇异函数（有间断点）直接数值积分——需要先处理奇异点"
+      ],
+      "pitfalls": [
+        "辛普森法要求 n 是偶数，否则公式不成立"
+      ],
+      "criterion": "**判断标准**：能解释 PDF 和 CDF 的关系，并用数值积分验证正态分布 68-95-99.7 法则 → 掌握本章。"
+    },
+    {
+      "type": "quote",
+      "text": "积分是数学对「无限细分再求和」这件事的尊重——它把极限变成了精确的工具。",
+      "by": "本课笔记"
+    }
+  ]
+}

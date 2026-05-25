@@ -1,0 +1,87 @@
+{
+  "meta": {
+    "slug": "gcd",
+    "chapter": "CHAPTER 05",
+    "title": "GCD 与 LCM：欧几里得算法",
+    "subtitle": "2300 年前的算法，今天还在 CPU 里跑",
+    "updated": "2026-05-25",
+    "reading_time": "8 分钟",
+    "audience": ["后端工程师", "算法爱好者"],
+    "problems_solved": [
+      "分数化简为什么要求 GCD",
+      "任务调度中最小公倍数怎么求",
+      "贝祖定理和模逆元有什么关系"
+    ],
+    "takeaways": [
+      "欧几里得算法：gcd(a,b) = gcd(b, a%b)，O(log min(a,b))",
+      "gcd(a,b) 是能被 a 和 b 整除的最大正整数",
+      "扩展欧几里得求出贝祖系数，直接得到模逆元"
+    ],
+    "breadcrumbs": ["程序猿数学课", "数论基础", "GCD 与 LCM"],
+    "prev": { "slug": "primes", "title": "素数与因式分解：数的基石" },
+    "next": { "slug": "fibonacci", "title": "斐波那契与递推数列" }
+  },
+  "blocks": [
+    {
+      "type": "summary",
+      "text": "最大公因数（GCD）是两个数共同因子中最大的那个。欧几里得算法在公元前 300 年就被发现，至今仍是最优算法之一。它的递推形式极简——`gcd(a,b) = gcd(b, a%b)`——但背后蕴含深刻的数论原理。"
+    },
+    {
+      "type": "heading", "level": 2, "text": "欧几里得算法的推导" },
+    {
+      "type": "paragraph",
+      "text": "为什么 `gcd(a,b) = gcd(b, a%b)` 成立？令 `a = qb + r`，若 d | a 且 d | b，则 d | r = a - qb；反之若 d | b 且 d | r，则 d | a。所以 a 和 b 的公因子集合 = b 和 r 的公因子集合，GCD 相等。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\n// 递归版（经典）\nfunc gcd(a, b int) int {\n    if b == 0 { return a }\n    return gcd(b, a%b)\n}\n\n// 迭代版（避免栈溢出）\nfunc gcdIter(a, b int) int {\n    for b != 0 {\n        a, b = b, a%b\n    }\n    return a\n}\n\n// 最小公倍数：lcm(a,b) = a*b / gcd(a,b)\n// 先除后乘，防止溢出\nfunc lcm(a, b int) int {\n    return a / gcd(a, b) * b\n}\n\nfunc main() {\n    // 分数化简：48/36 = (48/gcd) / (36/gcd) = 4/3\n    a, b := 48, 36\n    g := gcd(a, b)\n    fmt.Printf(\"%d/%d 化简为 %d/%d\\n\", a, b, a/g, b/g)\n\n    // 任务调度：A 每 12s 触发，B 每 8s 触发，多久同时触发？\n    fmt.Println(\"最小公倍数:\", lcm(12, 8))  // 24\n\n    // 验证欧几里得是对的\n    fmt.Println(gcd(252, 105))  // 21\n    fmt.Println(gcd(0, 5))      // 5（边界）\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "扩展欧几里得与贝祖定理" },
+    {
+      "type": "paragraph",
+      "text": "**贝祖定理**：存在整数 x, y 使得 `ax + by = gcd(a, b)`。扩展欧几里得算法不只返回 GCD，还返回这组系数 (x, y)。当 `gcd(a, m) = 1` 时，`ax ≡ 1 (mod m)`，x 就是 a 的==模逆元==。"
+    },
+    {
+      "type": "code",
+      "lang": "go",
+      "text": "package main\n\nimport \"fmt\"\n\n// 扩展欧几里得：返回 (gcd, x, y)，满足 a*x + b*y = gcd\nfunc extGCD(a, b int) (int, int, int) {\n    if b == 0 {\n        return a, 1, 0\n    }\n    g, x1, y1 := extGCD(b, a%b)\n    // 回溯：a*y1 + b*(x1 - (a/b)*y1) = g\n    return g, y1, x1 - (a/b)*y1\n}\n\nfunc main() {\n    g, x, y := extGCD(252, 105)\n    fmt.Printf(\"gcd=%d, x=%d, y=%d\\n\", g, x, y)  // gcd=21\n    fmt.Println(252*x + 105*y)  // 21 ✓\n\n    // 用 extGCD 求模逆元：3 * x ≡ 1 (mod 11)\n    _, inv, _ := extGCD(3, 11)\n    inv = (inv%11 + 11) % 11\n    fmt.Println(inv, 3*inv%11)  // 4  1 ✓\n}"
+    },
+    {
+      "type": "heading", "level": 2, "text": "应用：最简分数与音乐节拍" },
+    {
+      "type": "decision_table",
+      "headers": ["应用场景", "用 GCD/LCM", "具体做法"],
+      "rows": [
+        ["分数化简", "GCD", "分子分母同除 gcd(a,b)"],
+        ["多任务同步触发", "LCM", "求所有周期的最小公倍数"],
+        ["音乐节拍对齐", "LCM", "不同拍号的公共周期"],
+        ["模逆元（密码学）", "扩展 GCD", "gcd(a,m)=1 时求贝祖系数"],
+        ["公平分配", "GCD", "n 个数的 GCD 是最大公平分量"]
+      ],
+      "mnemonic": "**GCD 是公约，LCM 是公倍，扩展 GCD 是密码学的钥匙。**"
+    },
+    {
+      "type": "practice",
+      "do": [
+        "lcm 先除后乘：`a/gcd(a,b)*b`，避免 a*b 溢出",
+        "多个数的 GCD 用 reduce：`gcd(gcd(a,b), c)`",
+        "Go 1.21+ 可用 `math/gcd` 标准库"
+      ],
+      "dont": [
+        "用辗转相除以外的方法求 GCD——没有更快的通用方法",
+        "忘记 gcd(0, n) = n 这个边界"
+      ],
+      "pitfalls": [
+        "扩展 GCD 返回的 x 可能是负数，取模时要 `(x%m+m)%m`"
+      ],
+      "criterion": "**判断标准**：能用一句话证明欧几里得递推式的正确性 → 掌握本章。"
+    },
+    {
+      "type": "quote",
+      "text": "欧几里得算法是人类历史上第一个有记录的算法，它比零的发明还早 600 年。",
+      "by": "算法导论"
+    }
+  ]
+}
